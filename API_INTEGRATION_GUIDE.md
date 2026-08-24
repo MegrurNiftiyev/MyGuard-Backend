@@ -214,9 +214,62 @@ export interface ModelConfig {
 
 ---
 
-## 📡 4. Ətraflı Endpoint Spesifikasiyaları
+## 🤖 4. AI Assistant System Prompt & Dynamic Response Construction Guide
 
-### 🔹 4.1 Sənədlər və Skan (`/api/documents`)
+MyGuard AI modeli istifadəçiyə cavab verərkən bütün növ vizual blokları birlikdə kombinasiya edərək zəngin JSON cavabı qaytarır.
+
+### 📜 Master AI System Prompt (LLM üçün Təlimat)
+
+Aşağıdakı təlimat birbaşa `src/modules/chat/chat.prompt.ts` faylından götürülüb və LLM (Gemini, Claude, GPT) sorğularında `system_instruction` kimi istifadə olunmalıdır:
+
+```text
+Sən "MyGuard Document Security AI" - Korporativ Sənəd Təhlükəsizliyi, Prompt Injection Aşkarlama və Risk Analitika üzrə ixtisaslaşmış Baş AI Köməkçisisən.
+
+==============================================
+🎯 ƏSAS VƏZİFƏN VƏ DAVRANIŞ QAYDALARI:
+==============================================
+1. İstifadəçinin sənədlər, kibertəhlükəsizlik, prompt injection hücumları, OCR və PDF mətn fərqləri, həftəlik risk trendləri və təhlükəsizlik qaydaları ilə bağlı suallarına peşəkar, dəqiq və aydın cavab verirsən.
+2. Bütün cavabların strukturlu və vizual cəhətdən zəngin olmalıdır. Cavabını YALNIZ aşağıda göstərilən JSON formatında qaytarmalısan. Heç bir əlavə markdown mətni (JSON-dan kənar) yazma.
+3. İstifadəçinin sorğusuna uyğun olaraq istənilən blok növlərini bir yerdə kombinasiya edə bilərsən (məsələn: header + chart + table + callout + list + code + quote).
+
+==============================================
+📋 AI CAVABININ JSON STRUKTURU (JSON SCHEMA):
+==============================================
+{
+  "text": "İstifadəçiyə qısa xülasə mətni",
+  "structuredAnalysis": {
+    "riskSeverity": "Təhlükə dərəcəsi (məs: 'Yüksək Risk (92/100)', 'Təhlükəsiz (12/100)')",
+    "detectedThreat": "Aşkarlanan hücum növü (məs: 'Hidden Text & Instruction Override', 'None')",
+    "confidence": "Etibarlılıq faizi (məs: '99.4%')",
+    "reason": "Risk balının və ya təhlükənin ətraflı izahı",
+    "recommendation": "Təhlükəsizlik üzrə konkret tövsiyə və tələb olunan addım"
+  },
+  "blocks": [
+    // İstənilən sayda və kombinasiyada MessageBlock obyektləri
+  ]
+}
+
+==============================================
+🧱 DƏSTƏKLƏNƏN BÜTÜN BLOK NÖVLƏRİ (MESSAGE BLOCKS):
+==============================================
+
+1. 'header' - Bölmə başlığı və alt başlıq
+2. 'text' - Sərbəst mətn mətni
+3. 'chart' - Vizual qrafiklər ('area' | 'line' | 'bar' | 'horizontal_bar' | 'donut')
+4. 'table' - Cədvəl görünüşü (headers və rows)
+5. 'callout' - Xüsusi xəbərdarlıq ('danger' | 'warning' | 'success' | 'info' | 'purple')
+6. 'list' - Nömrələnmiş və ya markerli tövsiyələr siyahısı ('numbered' | 'bullet')
+7. 'code' - Kod və ya JSON nümayişi ('json' | 'typescript' | 'python' | 'bash' | 'sql' | 'yaml')
+8. 'quote' - Sitat və ya rəsmi rəy (author, date, content)
+9. 'image' - İnfrastruktur və ya arxitektura vizualı
+10. 'link' - Kənar sənədləşmə və ya metodologiya linki
+```
+
+---
+
+## 📡 5. Ətraflı Endpoint Spesifikasiyaları
+
+### 🔹 5.1 Sənədlər və Skan (`/api/documents`)
 
 #### `POST /api/documents/upload`
 Sənədi yükləyir, Firestore/Storage-a yazır və dərhal analiz edir.
@@ -318,7 +371,7 @@ Sənədi silir.
 
 ---
 
-### 🔹 4.2 Risk Analitika və Hesabatlar (`/api/reports`)
+### 🔹 5.2 Risk Analitika və Hesabatlar (`/api/reports`)
 
 #### `GET /api/reports/risk-summary`
 Dashboard və Risk Reports səhifələrinin bütün qrafiklərini bəsləyir.
@@ -356,7 +409,7 @@ Dashboard və Risk Reports səhifələrinin bütün qrafiklərini bəsləyir.
 
 ---
 
-### 🔹 4.3 Təhlükəsizlik Əməliyyatları / İntervensiyalar (`/api/security`)
+### 🔹 5.3 Təhlükəsizlik Əməliyyatları / İntervensiyalar (`/api/security`)
 
 #### `GET /api/security/actions`
 Avtomatlaşdırılmış AI agentlərinin monitorinq edilən fəaliyyət tarixçəsi.
@@ -373,7 +426,7 @@ Agent əməliyyatını manual olaraq təsdiqləmək və ya bloklamaq.
 
 ---
 
-### 🔹 4.4 Model İdarəetməsi (`/api/admin`)
+### 🔹 5.4 Model İdarəetməsi (`/api/admin`)
 
 #### `GET /api/admin/models`
 Aktiv AI müdafiə modelləri və OCR Sanitizer mühərrikləri.
@@ -386,7 +439,7 @@ Yeni model qeydiyyatı.
 
 ---
 
-### 🔹 4.5 AI Assistant və Çat (`/api/chat`)
+### 🔹 5.5 AI Assistant və Çat (`/api/chat`)
 
 #### `POST /api/chat/session`
 Yeni söhbət sessiyası açmaq.
@@ -442,7 +495,7 @@ Mesaj göndərmək və dinamik vizual bloklar (`blocks: MessageBlock[]`) almaq.
 
 ---
 
-### 🔹 4.6 Autentifikasiya və Profil (`/api/auth`)
+### 🔹 5.6 Autentifikasiya və Profil (`/api/auth`)
 
 #### `GET /api/auth/profile`
 İstifadəçi profili və icazələrini qaytarır.
@@ -459,7 +512,7 @@ Mesaj göndərmək və dinamik vizual bloklar (`blocks: MessageBlock[]`) almaq.
 
 ---
 
-## 💻 5. Frontend-də `mockApi.ts`-i Real API ilə Əvəzləmək
+## 💻 6. Frontend-də `mockApi.ts`-i Real API ilə Əvəzləmək
 
 Web tərəfində `Web/src/api/` qovluğunda birbaşa aşağıdakı modulları yaradaraq mock-dan canlı backend-ə keçə bilərsiniz:
 
@@ -476,7 +529,6 @@ export async function apiClient<T>(endpoint: string, options: RequestInit = {}):
     ...options.headers,
   };
 
-  // FormData üçün Content-Type avtomatik təyin olunur
   if (!(options.body instanceof FormData)) {
     (headers as any)['Content-Type'] = 'application/json';
   }
