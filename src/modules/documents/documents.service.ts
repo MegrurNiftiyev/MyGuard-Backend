@@ -86,7 +86,6 @@ export async function processAndSaveDocument(
           description: 'Sənədin 2-ci səhifəsində ağ fon üzərində 0.1pt ölçüsündə şriftlə gizlədilmiş injection payload əmri aşkar edildi.',
           location: 'Səhifə 2, Abzas 4, Əlaqə məlumatları altı',
           pageNumber: 2,
-          fontInfo: 'Helvetica 0.1pt #FFFFFF (Opacity: 0%)',
           severity: 'critical',
         },
         {
@@ -97,7 +96,6 @@ export async function processAndSaveDocument(
           description: 'AI köməkçisinin davranışını idarə edən sistem promptunu pozmağa çalışan birbaşa əmr.',
           location: 'Səhifə 2, Haşiyə kənarı (Margin box)',
           pageNumber: 2,
-          fontInfo: 'Arial 1.0pt #FAFAFA',
           severity: 'high',
         },
       ]
@@ -121,7 +119,6 @@ export async function processAndSaveDocument(
     flaggedMetadata: {
       pageNumber: 2,
       visibilityType: 'PDF Layer Only (OCR Invisible)',
-      fontInfo: 'Helvetica 0.1pt #FFFFFF (Opacity 0%)',
       location: 'Bölmə: Əlaqə məlumatları altı',
     },
   };

@@ -48,7 +48,6 @@ export interface ThreatItem {
   description: string;
   location: string;
   pageNumber: number;
-  fontInfo?: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
 }
 
@@ -70,7 +69,6 @@ export interface DetailedAnalysis {
   flaggedMetadata: {
     pageNumber: number;
     visibilityType: string;
-    fontInfo: string;
     location: string;
   };
 }
