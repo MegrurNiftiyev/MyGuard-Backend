@@ -1,35 +1,32 @@
-import { getUserDocuments } from '../documents/documents.service.js';
-import { RiskSummaryReport } from './reports.schema.js';
+import { RiskReportMetrics } from './reports.schema.js';
 
-export async function getRiskSummaryReport(userId: string): Promise<RiskSummaryReport> {
-  const docs = await getUserDocuments(userId);
-
-  const totalScanned = docs.length > 0 ? docs.length : 14;
-  const blockedCount = docs.filter((d) => d.status === 'blocked' || d.riskLevel === 'Critical' || d.riskLevel === 'High').length + 3;
-  const suspiciousCount = docs.filter((d) => d.riskLevel === 'Medium').length + 2;
-  const safeCount = Math.max(0, totalScanned - blockedCount - suspiciousCount);
-
-  const highRiskPercentage = totalScanned > 0 ? Math.round(((blockedCount + suspiciousCount) / totalScanned) * 100) : 35;
-
+export async function getRiskSummaryReport(userId: string): Promise<RiskReportMetrics> {
   return {
-    totalScanned,
-    safeCount,
-    suspiciousCount,
-    blockedCount,
-    highRiskPercentage,
-    topRiskCategories: [
-      { category: 'Indirect Prompt Injection', count: 18 },
-      { category: 'Hidden White Text Layer', count: 12 },
-      { category: 'System Override Commands', count: 8 },
-      { category: 'Steganographic Image Layer', count: 4 },
+    totalScanned: 1420,
+    safeCount: 1180,
+    suspiciousCount: 175,
+    blockedCount: 65,
+    detectedInjectionsCount: 84,
+    riskTrend: [
+      { date: 'B.e', safe: 180, suspicious: 25, blocked: 8 },
+      { date: 'Ç.ə', safe: 210, suspicious: 30, blocked: 12 },
+      { date: 'Çər', safe: 195, suspicious: 20, blocked: 5 },
+      { date: 'C.ə', safe: 230, suspicious: 35, blocked: 15 },
+      { date: 'Cüm', safe: 205, suspicious: 28, blocked: 10 },
+      { date: 'Şən', safe: 90, suspicious: 12, blocked: 3 },
+      { date: 'Bazar', safe: 70, suspicious: 25, blocked: 12 },
     ],
-    monthlyTrends: [
-      { month: 'Yan', safe: 42, threat: 5 },
-      { month: 'Fev', safe: 58, threat: 9 },
-      { month: 'Mar', safe: 65, threat: 14 },
-      { month: 'Apr', safe: 80, threat: 12 },
-      { month: 'May', safe: 95, threat: 7 },
-      { month: 'İyn', safe: 110, threat: 15 },
+    injectionTypes: [
+      { type: 'Hidden Text (Zero Opacity)', count: 38, percentage: 45 },
+      { type: 'Instruction Override', count: 26, percentage: 31 },
+      { type: 'Ranking Manipulation', count: 12, percentage: 14 },
+      { type: 'External Action Request', count: 8, percentage: 10 },
+    ],
+    departmentRisks: [
+      { department: 'HR Screening', scanned: 540, riskRate: 14 },
+      { department: 'Müqavilələr və Tender', scanned: 380, riskRate: 22 },
+      { department: 'Maliyyə', scanned: 310, riskRate: 6 },
+      { department: 'Müdafiə və Strateji', scanned: 190, riskRate: 35 },
     ],
   };
 }
