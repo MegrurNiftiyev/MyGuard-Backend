@@ -195,3 +195,14 @@ export interface AnalysisPipeline {
   finalRiskScore: number;
   finalStatus: 'safe' | 'suspicious' | 'high_risk';
 }
+
+export interface Intervention {
+  id: string;
+  agent: string;
+  action: string;
+  file: string;
+  destination: string;
+  status: 'blocked' | 'allowed';
+  timestamp: string;
+}
+
