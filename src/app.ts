@@ -45,8 +45,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Authenticated API Routes
-app.use('/api/auth', requireAuth, authRoutes);
+// Authentication Routes (Public & Protected routes handled internally)
+app.use('/api/auth', authRoutes);
+
+// Protected Core Application Routes
 app.use('/api/documents', requireAuth, documentRoutes);
 app.use('/api/reports', requireAuth, reportRoutes);
 app.use('/api/chat', requireAuth, chatRoutes);

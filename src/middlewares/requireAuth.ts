@@ -1,8 +1,11 @@
 import { Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { auth, isFirebaseInitialized } from '../config/firebase.js';
 import { AuthenticatedRequest } from '../types/index.js';
 import { AppError } from '../errors/AppError.js';
 import { env } from '../config/env.js';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'myguard-super-secret-jwt-key-2026';
 
 export async function requireAuth(
   req: AuthenticatedRequest,
@@ -14,18 +17,34 @@ export async function requireAuth(
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     if (env.NODE_ENV === 'development' || !isFirebaseInitialized) {
       req.user = {
-        uid: 'dev-user-123',
-        email: 'developer@myguard.internal',
+        uid: 'usr-admin-001',
+        email: 'e.mammadov@soc.gov.az',
         role: 'admin',
       };
       return next();
     }
 
-    return next(new AppError('Unauthorized: Missing or invalid Authorization Bearer header', 401));
+    return next(new AppError('Avtorizasiya tələb olunur (Missing Bearer Token)', 401));
   }
 
-  const token = authHeader.split('Bearer ')[1];
+  const token = authHeader.split('Bearer ')[1].trim();
 
+  // 1. Try verifying JWT Token
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    if (decoded && decoded.uid) {
+      req.user = {
+        uid: decoded.uid,
+        email: decoded.email,
+        role: decoded.role || 'user',
+      };
+      return next();
+    }
+  } catch (jwtErr) {
+    // Continue to Firebase verification
+  }
+
+  // 2. Try verifying Firebase ID Token
   try {
     if (isFirebaseInitialized && auth) {
       const decodedToken = await auth.verifyIdToken(token);
@@ -34,16 +53,21 @@ export async function requireAuth(
         email: decodedToken.email,
         role: (decodedToken.role as string) || 'user',
       };
-    } else {
-      req.user = {
-        uid: 'dev-user-123',
-        email: 'developer@myguard.internal',
-        role: 'admin',
-      };
+      return next();
     }
-    next();
-  } catch (error) {
-    console.error('[Auth Middleware] Token verification failed:', error);
-    next(new AppError('Unauthorized: Invalid Firebase ID token', 401));
+  } catch (firebaseErr) {
+    console.error('[Auth Middleware] Token verification failed:', firebaseErr);
   }
+
+  // 3. Fallback for development if token exists
+  if (env.NODE_ENV === 'development' || !isFirebaseInitialized) {
+    req.user = {
+      uid: 'usr-admin-001',
+      email: 'e.mammadov@soc.gov.az',
+      role: 'admin',
+    };
+    return next();
+  }
+
+  next(new AppError('Etibarsız və ya vaxtı bitmiş token', 401));
 }
