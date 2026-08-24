@@ -6,10 +6,12 @@ import { errorHandler } from './middlewares/errorHandler.js';
 import { swaggerSpec } from './config/swagger.js';
 import { isFirebaseInitialized } from './config/firebase.js';
 
+import authRoutes from './modules/auth/auth.routes.js';
 import documentRoutes from './modules/documents/documents.routes.js';
 import reportRoutes from './modules/reports/reports.routes.js';
 import chatRoutes from './modules/chat/chat.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
+import securityRoutes from './modules/security/security.routes.js';
 
 const app = express();
 
@@ -44,10 +46,12 @@ app.get('/api/health', (req, res) => {
 });
 
 // Authenticated API Routes
+app.use('/api/auth', requireAuth, authRoutes);
 app.use('/api/documents', requireAuth, documentRoutes);
 app.use('/api/reports', requireAuth, reportRoutes);
 app.use('/api/chat', requireAuth, chatRoutes);
 app.use('/api/admin', requireAuth, adminRoutes);
+app.use('/api/security', requireAuth, securityRoutes);
 
 // Legacy Single-Endpoint Support
 app.post('/api/analyze', requireAuth, documentRoutes);

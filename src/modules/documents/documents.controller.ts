@@ -5,6 +5,8 @@ import {
   getUserDocuments,
   getDocumentById,
   deleteDocumentRecord,
+  getScanStepsForDocument,
+  getPipelineForDocument,
 } from './documents.service.js';
 import { AppError } from '../../errors/AppError.js';
 
@@ -45,11 +47,19 @@ export async function analyzeDocumentLegacy(req: AuthenticatedRequest, res: Resp
 
   res.json({
     documentId: result.document.id,
-    status: result.analysis.status,
-    layer1_ocrTextMatch: result.analysis.layer1_ocrTextMatch,
-    layer2_classification: result.analysis.layer2_classification,
-    layer3_llmAnalysis: result.analysis.layer3_llmAnalysis,
-    overallRiskScore: result.analysis.overallRiskScore,
+    status: result.analysis.riskStatus,
+    layer1_ocrTextMatch: {
+      matchPercent: result.analysis.ocrPdfMatch,
+      hiddenTextDetected: result.analysis.hiddenTextDetected,
+    },
+    layer2_classification: {
+      confidence: result.analysis.promptInjectionProb / 100,
+      label: result.analysis.riskStatus === 'safe' ? 'safe' : 'injection',
+    },
+    layer3_llmAnalysis: {
+      explanation: result.analysis.plainExplanation,
+    },
+    overallRiskScore: result.analysis.riskScore,
   });
 }
 
@@ -68,6 +78,38 @@ export async function getDocumentDetails(req: AuthenticatedRequest, res: Respons
   }
 
   res.json(data);
+}
+
+export async function getDocumentScanSteps(req: AuthenticatedRequest, res: Response) {
+  const docId = String(req.params.id);
+  const steps = await getScanStepsForDocument(docId);
+  res.json({ documentId: docId, steps });
+}
+
+export async function getDocumentPipeline(req: AuthenticatedRequest, res: Response) {
+  const docId = String(req.params.id);
+  const pipeline = await getPipelineForDocument(docId);
+  res.json({ pipeline });
+}
+
+export async function getDocumentComparison(req: AuthenticatedRequest, res: Response) {
+  const docId = String(req.params.id);
+  const data = await getDocumentById(docId);
+
+  if (!data.analysis) {
+    throw new AppError('Analiz məlumatı tapılmadı', 404);
+  }
+
+  res.json({
+    documentId: docId,
+    documentName: data.analysis.documentName,
+    ocrText: data.analysis.ocrText,
+    pdfTextLayer: data.analysis.pdfTextLayer,
+    ocrPdfMatch: data.analysis.ocrPdfMatch,
+    hiddenTextDetected: data.analysis.hiddenTextDetected,
+    flaggedSnippet: data.analysis.flaggedSnippet,
+    flaggedMetadata: data.analysis.flaggedMetadata,
+  });
 }
 
 export async function deleteDocument(req: AuthenticatedRequest, res: Response) {

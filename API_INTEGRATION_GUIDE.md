@@ -1,51 +1,227 @@
-# 🔌 MyGuard API Implementation & Integration Guide for Web Frontend
+# 🌐 MyGuard — Complete Web Frontend API Integration Guide
 
-Bu sənəd **MyGuard Backend REST API** ilə **Web Frontend** interfeysinin inteqrasiyası üçün hazırlanmış ətraflı bələdçidir. Bütün endpoint-lər, sorğu (Request) və cavab (Response) JSON tipləri, parametrlər və frontend tərəfindən istifadə qaydaları aşağıda qeyd olunmuşdur.
-
----
-
-## 📌 Əsas İnformasiya
-
-- **Base URL:** `http://localhost:3001` (və ya canlı server URL-i)
-- **API Prefiksi:** `/api`
-- **Autentifikasiya:** Header-də `Authorization: Bearer <Firebase_ID_Token>`
-- **Content-Type:** JSON sorğuları üçün `application/json`, fayl yükləmələri üçün `multipart/form-data`
+Bu sənəd **MyGuard Web Frontend** tətbiqinin bütün səhifələrini (`Dashboard`, `Scan`, `Documents`, `Detailed Analysis`, `OCR ↔ PDF Comparison`, `Risk Reports`, `Action Security / Interventions`, `Model Management`, `AI Assistant / Chat`, `Settings`) **Backend REST API** ilə 100% inteqrasiya etmək üçün hazırlanmış hərtərəfli bələdçidir.
 
 ---
 
-## 🗂️ Modullar və Endpoint-lər
+## 📌 1. Əsas Konfiqurasiya və Şərtlər
 
-```text
-/api
- ├── /documents
- │    ├── POST /upload             # Sənəd yüklənməsi və avtomatik skan
- │    ├── GET /                    # Bütün yüklənmiş sənədlərin siyahısı
- │    ├── GET /:id                 # Sənədin dərin təhlükəsizlik analizi (DetailedAnalysis)
- │    └── DELETE /:id              # Sənədin və analizinin silinməsi
- ├── /reports
- │    └── GET /risk-summary        # Ümumi risk statistikası və trendlər (RiskReportMetrics)
- ├── /chat
- │    ├── POST /session            # Yeni AI çat sessiyası yaratmaq
- │    ├── GET /history/:sessionId  # Sessiya mesaj tarixçəsini almaq
- │    └── POST /message            # AI-a mesaj göndərmək (blok tipli cavablar almaq)
- ├── /admin
- │    ├── GET /models              # Aktiv ML və Sanitizer modellərinin siyahısı
- │    └── POST /models             # Yeni ML modeli qeydiyyata almaq
- └── GET /health                   # Serverin canlılıq və Firebase statusu
+- **Base Server URL:** `http://localhost:3001`
+- **Swagger Interactive UI:** `http://localhost:3001/api-docs`
+- **Autentifikasiya:** Bütün qorunan sorğularda `Authorization: Bearer <Firebase_ID_Token>` göndərilir. *(Qeyd: Local development rejimində token ötürülmədikdə server avtomatik admin dev-user identifikasiyası tətbiq edir).*
+- **Standart Başlıqlar:**
+  ```http
+  Accept: application/json
+  Authorization: Bearer <token>
+  ```
+
+---
+
+## 🗺️ 2. Səhifələr və Backend Endpoint Xəritəsi
+
+| Web Səhifəsi / Modul | Lazım olan Endpointlər | Əlaqəli Tip / İnterfeys |
+| :--- | :--- | :--- |
+| **1. Dashboard & Analytics** | `GET /api/reports/risk-summary`<br>`GET /api/documents` | `RiskReportMetrics`, `DocumentItem[]` |
+| **2. Scan & Upload Page** | `POST /api/documents/upload`<br>`GET /api/documents/:id/scan-steps`<br>`GET /api/documents/:id/pipeline` | `DocumentItem`, `ScanStep[]`, `AnalysisPipeline` |
+| **3. Documents List Page** | `GET /api/documents`<br>`DELETE /api/documents/:id` | `DocumentItem[]` |
+| **4. Analysis Result Page** | `GET /api/documents/:id` | `DetailedAnalysis`, `ThreatItem[]` |
+| **5. Text Comparison Page** | `GET /api/documents/:id/comparison` | `DetailedAnalysis` (ocrText, pdfTextLayer) |
+| **6. Risk Reports Page** | `GET /api/reports/risk-summary` | `RiskReportMetrics` |
+| **7. Action Security Page** | `GET /api/security/actions`<br>`GET /api/security/interventions`<br>`PATCH /api/security/actions/:id/decision` | `AgentAction[]`, `Intervention[]` |
+| **8. Model Management** | `GET /api/admin/models`<br>`POST /api/admin/models` | `ModelConfig[]` |
+| **9. AI Assistant / Chat** | `POST /api/chat/session`<br>`GET /api/chat/history/:sessionId`<br>`POST /api/chat/message` | `ChatMessage[]`, `MessageBlock[]` |
+| **10. User & Settings** | `GET /api/auth/profile` | `AuthenticatedUser` |
+
+---
+
+## 📦 3. TypeScript Modelləri və İnterfeysləri (Types Reference)
+
+Aşağıdakı tiplər Web frontend (`Web/src/types/index.ts`) ilə 1:1 eynidir:
+
+```typescript
+export type RiskStatus = 'safe' | 'suspicious' | 'high_risk' | 'blocked';
+export type StepStatus = 'processing' | 'completed' | 'warning' | 'failed';
+export type ActionDecision = 'ALLOWED' | 'BLOCKED' | 'REQUIRES_CONFIRMATION';
+export type SensitivityLevel = 'Low' | 'Medium' | 'High' | 'Critical';
+export type AIModelMode = 'STANDARD AI' | 'CONFIDENTIAL AI';
+
+// Sənəd Qeydi
+export interface DocumentItem {
+  id: string;
+  name: string;
+  fileType: string;
+  size: string;
+  uploadTime: string;
+  riskScore: number;
+  status: RiskStatus;
+  ocrPdfMatch: number;
+  hiddenTextDetected: boolean;
+  promptInjectionProb: number;
+  department: string;
+  flaggedCount: number;
+  category: string;
+  fileUrl?: string;
+}
+
+// 7-Mərhələli Skan Addımları
+export interface ScanStep {
+  stepNumber: number;
+  title: string;
+  description: string;
+  status: StepStatus;
+}
+
+// Aşkarlanan Təhdidlər
+export interface ThreatItem {
+  id: string;
+  type: 'Hidden Text' | 'Instruction Override' | 'Ranking Manipulation' | 'External Action Request';
+  title: string;
+  snippet: string;
+  description: string;
+  location: string;
+  pageNumber: number;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+}
+
+// Dərin Təhlil Nəticəsi
+export interface DetailedAnalysis {
+  documentId: string;
+  documentName: string;
+  fileType: string;
+  uploadTime: string;
+  riskStatus: RiskStatus;
+  riskScore: number;
+  ocrPdfMatch: number;
+  hiddenTextDetected: boolean;
+  promptInjectionProb: number;
+  plainExplanation: string;
+  threats: ThreatItem[];
+  ocrText: string;
+  pdfTextLayer: string;
+  flaggedSnippet: string;
+  flaggedMetadata: {
+    pageNumber: number;
+    visibilityType: string;
+    location: string;
+  };
+}
+
+// Çat və Blok Tipləri
+export interface StructuredAiAnalysis {
+  riskSeverity: string;
+  detectedThreat: string;
+  confidence: string;
+  reason: string;
+  recommendation: string;
+}
+
+export type MessageBlockType = 
+  | 'header' | 'text' | 'chart' | 'table' | 'analysis' 
+  | 'callout' | 'link' | 'file' | 'image' | 'code' | 'quote' | 'list';
+
+export interface MessageBlock {
+  type: MessageBlockType;
+  title?: string;
+  subtitle?: string;
+  content?: string;
+  chartType?: 'area' | 'line' | 'bar' | 'horizontal_bar' | 'donut';
+  chartData?: any[];
+  chartKeys?: { 
+    nameKey?: string; 
+    valueKey?: string; 
+    dataKeys?: { key: string; tone?: string; color?: string; label?: string }[] 
+  };
+  imageUrl?: string;
+  imageAlt?: string;
+  name?: string;
+  sizeLabel?: string;
+  actionLabel?: string;
+  actionUrl?: string;
+  tableData?: { headers: string[]; rows: (string | number)[][] };
+  headers?: string[];
+  rows?: (string | number)[][];
+  analysisData?: StructuredAiAnalysis;
+  tone?: 'primary' | 'secondary' | 'danger' | 'warning' | 'success' | 'info' | 'purple' | 'indigo';
+  url?: string;
+  label?: string;
+  description?: string;
+  code?: string;
+  language?: string;
+  author?: string;
+  date?: string;
+  items?: string[];
+  listType?: 'numbered' | 'bullet';
+}
+
+export interface ChatMessage {
+  id: string;
+  sessionId?: string;
+  sender: 'user' | 'assistant';
+  timestamp: string;
+  text?: string;
+  structuredAnalysis?: StructuredAiAnalysis;
+  blocks?: MessageBlock[];
+}
+
+// Risk Statistikası
+export interface RiskReportMetrics {
+  totalScanned: number;
+  safeCount: number;
+  suspiciousCount: number;
+  blockedCount: number;
+  detectedInjectionsCount: number;
+  riskTrend: Array<{ date: string; safe: number; suspicious: number; blocked: number }>;
+  injectionTypes: Array<{ type: string; count: number; percentage: number }>;
+  departmentRisks: Array<{ department: string; scanned: number; riskRate: number }>;
+}
+
+// Agent Actions & Interventions
+export interface AgentAction {
+  id: string;
+  action: string;
+  file: string;
+  destination: string;
+  sensitivity: SensitivityLevel;
+  decision: ActionDecision;
+  timestamp: string;
+  reason: string;
+}
+
+export interface Intervention {
+  id: string;
+  agent: string;
+  action: string;
+  file: string;
+  destination: string;
+  status: 'blocked' | 'allowed';
+  timestamp: string;
+}
+
+// Model İdarəetməsi
+export interface ModelConfig {
+  id: string;
+  name: string;
+  mode: AIModelMode;
+  status: 'Active' | 'Standby' | 'Offline';
+  isLocal: boolean;
+  lastUpdate: string;
+  provider: string;
+  description: string;
+  latency: string;
+  maxContext: string;
+}
 ```
 
 ---
 
-## 1. 📄 Sənədlər Modulu (`/api/documents`)
+## 📡 4. Ətraflı Endpoint Spesifikasiyaları
 
-### 1.1 POST `/api/documents/upload`
-Sənəd yükləyir və dərhal Layer 1 (PDF/OCR), Layer 2 (Prompt Injection Classifier) və Layer 3 (Security LLM) analizlərini icra edir.
+### 🔹 4.1 Sənədlər və Skan (`/api/documents`)
 
-- **Content-Type:** `multipart/form-data`
-- **Request Body:**
-  - `document`: `File` (PDF və ya DOCX faylı)
-
-- **Response JSON (200 OK):**
+#### `POST /api/documents/upload`
+Sənədi yükləyir, Firestore/Storage-a yazır və dərhal analiz edir.
+- **Request:** `FormData` (`document: File`)
+- **Response (200 OK):**
 ```json
 {
   "success": true,
@@ -100,92 +276,53 @@ Sənəd yükləyir və dərhal Layer 1 (PDF/OCR), Layer 2 (Prompt Injection Clas
 }
 ```
 
----
+#### `GET /api/documents`
+Bütün sənədlər siyahısını qaytarır.
+- **Response (200 OK):** `{ "documents": [ DocumentItem, ... ] }`
 
-### 1.2 GET `/api/documents`
-Daxil olmuş istifadəçinin bütün yüklədiyi sənədlərin siyahısını qaytarır.
+#### `GET /api/documents/:id`
+Tək sənəd və onun dərin analizini qaytarır.
+- **Response (200 OK):** `{ "document": DocumentItem, "analysis": DetailedAnalysis }`
 
-- **Response JSON (200 OK):**
+#### `GET /api/documents/:id/scan-steps`
+Scan səhifəsində real-time 7 mərhələli animasiyanı idarə etmək üçün addımları qaytarır.
+- **Response (200 OK):** `{ "documentId": "doc-001", "steps": ScanStep[] }`
+
+#### `GET /api/documents/:id/pipeline`
+Layer 1, Layer 2 və Layer 3 boru xəttinin vəziyyətini qaytarır.
+- **Response (200 OK):** `{ "pipeline": AnalysisPipeline }`
+
+#### `GET /api/documents/:id/comparison`
+OCR və PDF mətnlərinin müqayisə ekranı üçün məlumatları qaytarır.
+- **Response (200 OK):**
 ```json
 {
-  "documents": [
-    {
-      "id": "doc-001",
-      "name": "HR_Muraciet_Samir_Aliyev.pdf",
-      "fileType": "PDF",
-      "size": "2.4 MB",
-      "uploadTime": "10 dəqiqə əvvəl",
-      "riskScore": 92,
-      "status": "high_risk",
-      "ocrPdfMatch": 72,
-      "hiddenTextDetected": true,
-      "promptInjectionProb": 94,
-      "department": "HR Screening",
-      "flaggedCount": 3,
-      "category": "İnsan Resursları"
-    }
-  ]
-}
-```
-
----
-
-### 1.3 GET `/api/documents/:id`
-Tək bir sənədin ətraflı təhlükəsizlik analizini (`DetailedAnalysis`) qaytarır.
-
-- **Path Parameter:** `id` (məs: `doc-001`)
-- **Response JSON (200 OK):**
-```json
-{
-  "document": {
-    "id": "doc-001",
-    "name": "HR_Muraciet_Samir_Aliyev.pdf",
-    "riskScore": 92,
-    "status": "high_risk"
-  },
-  "analysis": {
-    "documentId": "doc-001",
-    "documentName": "HR_Muraciet_Samir_Aliyev.pdf",
-    "riskStatus": "high_risk",
-    "riskScore": 92,
-    "ocrPdfMatch": 72,
-    "hiddenTextDetected": true,
-    "promptInjectionProb": 94,
-    "plainExplanation": "Sənədin daxilində insan tərəfindən normal görünməyən mətn aşkarlandı.",
-    "threats": [],
-    "ocrText": "...",
-    "pdfTextLayer": "...",
-    "flaggedSnippet": "Ignore previous instructions...",
-    "flaggedMetadata": {
-      "pageNumber": 2,
-      "visibilityType": "PDF Layer Only (OCR Invisible)",
-      "location": "Bölmə: Əlaqə məlumatları altı"
-    }
+  "documentId": "doc-001",
+  "documentName": "HR_Muraciet_Samir_Aliyev.pdf",
+  "ocrText": "...",
+  "pdfTextLayer": "...",
+  "ocrPdfMatch": 72,
+  "hiddenTextDetected": true,
+  "flaggedSnippet": "Ignore previous instructions...",
+  "flaggedMetadata": {
+    "pageNumber": 2,
+    "visibilityType": "PDF Layer Only (OCR Invisible)",
+    "location": "Bölmə: Əlaqə məlumatları altı"
   }
 }
 ```
 
----
-
-### 1.4 DELETE `/api/documents/:id`
-Sənədi və onun analitik qeydlərini silir.
-
-- **Response JSON (200 OK):**
-```json
-{
-  "success": true,
-  "message": "Sənəd uğurla silindi"
-}
-```
+#### `DELETE /api/documents/:id`
+Sənədi silir.
+- **Response (200 OK):** `{ "success": true, "message": "Sənəd uğurla silindi" }`
 
 ---
 
-## 2. 📊 Risk Analitika və Hesabatlar (`/api/reports`)
+### 🔹 4.2 Risk Analitika və Hesabatlar (`/api/reports`)
 
-### 2.1 GET `/api/reports/risk-summary`
-Dashboard və Risk Reports səhifələrini bəsləmək üçün ümumi risk göstəricilərini qaytarır.
-
-- **Response JSON (200 OK):**
+#### `GET /api/reports/risk-summary`
+Dashboard və Risk Reports səhifələrinin bütün qrafiklərini bəsləyir.
+- **Response (200 OK):**
 ```json
 {
   "totalScanned": 1420,
@@ -195,86 +332,74 @@ Dashboard və Risk Reports səhifələrini bəsləmək üçün ümumi risk göst
   "detectedInjectionsCount": 84,
   "riskTrend": [
     { "date": "B.e", "safe": 180, "suspicious": 25, "blocked": 8 },
-    { "date": "Ç.ə", "safe": 210, "suspicious": 30, "blocked": 12 }
+    { "date": "Ç.ə", "safe": 210, "suspicious": 30, "blocked": 12 },
+    { "date": "Çər", "safe": 195, "suspicious": 20, "blocked": 5 },
+    { "date": "C.ə", "safe": 230, "suspicious": 35, "blocked": 15 },
+    { "date": "Cüm", "safe": 205, "suspicious": 28, "blocked": 10 },
+    { "date": "Şən", "safe": 90, "suspicious": 12, "blocked": 3 },
+    { "date": "Bazar", "safe": 70, "suspicious": 25, "blocked": 12 }
   ],
   "injectionTypes": [
     { "type": "Hidden Text (Zero Opacity)", "count": 38, "percentage": 45 },
-    { "type": "Instruction Override", "count": 26, "percentage": 31 }
+    { "type": "Instruction Override", "count": 26, "percentage": 31 },
+    { "type": "Ranking Manipulation", "count": 12, "percentage": 14 },
+    { "type": "External Action Request", "count": 8, "percentage": 10 }
   ],
   "departmentRisks": [
     { "department": "HR Screening", "scanned": 540, "riskRate": 14 },
-    { "department": "Müqavilələr və Tender", "scanned": 380, "riskRate": 22 }
+    { "department": "Müqavilələr və Tender", "scanned": 380, "riskRate": 22 },
+    { "department": "Maliyyə", "scanned": 310, "riskRate": 6 },
+    { "department": "Müdafiə və Strateji", "scanned": 190, "riskRate": 35 }
   ]
 }
 ```
 
 ---
 
-## 3. 💬 AI Assistant Çat Modulu (`/api/chat`)
+### 🔹 4.3 Təhlükəsizlik Əməliyyatları / İntervensiyalar (`/api/security`)
 
-### 3.1 POST `/api/chat/session`
-Yeni interaktiv AI söhbət sessiyası yaradır.
+#### `GET /api/security/actions`
+Avtomatlaşdırılmış AI agentlərinin monitorinq edilən fəaliyyət tarixçəsi.
+- **Response (200 OK):** `{ "actions": AgentAction[] }`
 
-- **Request Body (JSON):**
-```json
-{
-  "title": "Sənəd Təhlükəsizliyi Söhbəti"
-}
-```
+#### `GET /api/security/interventions`
+Bloklanan və icazə verilən əməliyyatlar.
+- **Response (200 OK):** `{ "interventions": Intervention[] }`
 
-- **Response JSON (200 OK):**
-```json
-{
-  "success": true,
-  "session": {
-    "id": "session-1724500000",
-    "userId": "dev-user-123",
-    "title": "Sənəd Təhlükəsizliyi Söhbəti",
-    "createdAt": "2026-08-24T16:00:00.000Z",
-    "updatedAt": "2026-08-24T16:00:00.000Z"
-  }
-}
-```
+#### `PATCH /api/security/actions/:id/decision`
+Agent əməliyyatını manual olaraq təsdiqləmək və ya bloklamaq.
+- **Request Body:** `{ "decision": "ALLOWED" | "BLOCKED" | "REQUIRES_CONFIRMATION" }`
+- **Response (200 OK):** `{ "success": true, "action": AgentAction }`
 
 ---
 
-### 3.2 GET `/api/chat/history/:sessionId`
-Müəyyən sessiyaya aid əvvəlki mesajları yükləyir.
+### 🔹 4.4 Model İdarəetməsi (`/api/admin`)
 
-- **Response JSON (200 OK):**
-```json
-{
-  "sessionId": "session-1724500000",
-  "messages": [
-    {
-      "id": "msg-1",
-      "sender": "user",
-      "text": "Bu sənəddə niyə yuxarı risk var?",
-      "timestamp": "14:32"
-    },
-    {
-      "id": "msg-2",
-      "sender": "assistant",
-      "text": "Sənəd daxilində zərərli mətnlər aşkar edilmişdir.",
-      "timestamp": "14:32",
-      "structuredAnalysis": {
-        "riskSeverity": "Yüksək Risk (92/100)",
-        "detectedThreat": "Hidden Text & Instruction Override",
-        "confidence": "99.4%",
-        "reason": "PDF mətn qatında 0.1pt ölçülü əmr yerləşdirilib.",
-        "recommendation": "Sənəd BLOKLANMALIDIR."
-      }
-    }
-  ]
-}
-```
+#### `GET /api/admin/models`
+Aktiv AI müdafiə modelləri və OCR Sanitizer mühərrikləri.
+- **Response (200 OK):** `{ "models": ModelConfig[] }`
+
+#### `POST /api/admin/models`
+Yeni model qeydiyyatı.
+- **Request Body:** `{ "name": "string", "provider": "string", "mode": "STANDARD AI" | "CONFIDENTIAL AI" }`
+- **Response (200 OK):** `{ "success": true, "model": ModelConfig }`
 
 ---
 
-### 3.3 POST `/api/chat/message`
-AI köməkçisinə mesaj göndərir və dinamik vizual bloklar (`MessageBlock[]`) alır.
+### 🔹 4.5 AI Assistant və Çat (`/api/chat`)
 
-- **Request Body (JSON):**
+#### `POST /api/chat/session`
+Yeni söhbət sessiyası açmaq.
+- **Request Body:** `{ "title": "Sənəd Təhlükəsizliyi Söhbəti" }`
+- **Response (200 OK):** `{ "success": true, "session": { "id": "session-1724500000", ... } }`
+
+#### `GET /api/chat/history/:sessionId`
+Sessiya mesaj tarixçəsi.
+- **Response (200 OK):** `{ "sessionId": "...", "messages": ChatMessage[] }`
+
+#### `POST /api/chat/message`
+Mesaj göndərmək və dinamik vizual bloklar (`blocks: MessageBlock[]`) almaq.
+- **Request Body:**
 ```json
 {
   "sessionId": "session-1724500000",
@@ -282,68 +407,34 @@ AI köməkçisinə mesaj göndərir və dinamik vizual bloklar (`MessageBlock[]`
   "attachmentDocumentId": "doc-001"
 }
 ```
-
-- **Response JSON (200 OK):**
+- **Response (200 OK):**
 ```json
 {
   "success": true,
   "userMessage": {
-    "id": "msg-1724500001",
+    "id": "msg-1",
     "sessionId": "session-1724500000",
     "sender": "user",
-    "timestamp": "16:15",
+    "timestamp": "16:45",
     "text": "Həftəlik risk dinamikasını göstər"
   },
   "assistantMessage": {
-    "id": "msg-1724500002",
+    "id": "msg-2",
     "sessionId": "session-1724500000",
     "sender": "assistant",
-    "timestamp": "16:15",
-    "text": "Sualınıza uyğun ətraflı təhlükəsizlik hesabatı və analiz blokları aşağıda verilmişdir.",
+    "timestamp": "16:45",
+    "text": "Sualınıza uyğun ətraflı hesabat aşağıdadır.",
     "structuredAnalysis": {
       "riskSeverity": "Yüksək Risk (92/100)",
       "detectedThreat": "Hidden Text & Instruction Override",
       "confidence": "99.4%",
-      "reason": "PDF mətn qatında zərərli əmr yerləşdirilib.",
-      "recommendation": "Sənədin korporativ AI-a ötürülməsi BLOKLANMALIDIR."
+      "reason": "Sənəddə gizli təlimat aşkarlandı.",
+      "recommendation": "Sənəd bloklanmalıdır."
     },
     "blocks": [
-      {
-        "type": "header",
-        "title": "Həftəlik Risk və Sənəd Axını Dinamikası",
-        "subtitle": "Son 7 gün ərzində skan edilən sənədlər."
-      },
-      {
-        "type": "chart",
-        "title": "Risk və Sənəd Həcmi Dinamikası",
-        "chartType": "area",
-        "chartKeys": {
-          "nameKey": "date",
-          "dataKeys": [
-            { "key": "scanned", "tone": "primary", "label": "Skan edilən sənədlər" },
-            { "key": "blocked", "tone": "danger", "label": "Bloklanan risklər" }
-          ]
-        },
-        "chartData": [
-          { "date": "15 May", "scanned": 170, "blocked": 10 },
-          { "date": "16 May", "scanned": 210, "blocked": 15 }
-        ]
-      },
-      {
-        "type": "table",
-        "title": "Əsas Göstəricilər",
-        "headers": ["Göstərici", "Bu Həftə", "Dəyişim"],
-        "rows": [
-          ["🌊 Skan edilən sənədlər", "1,248", "+12.7%"],
-          ["🛡️ Bloklanan risklər", "58", "-23.7%"]
-        ]
-      },
-      {
-        "type": "code",
-        "title": "Nümunə JSON",
-        "language": "json",
-        "code": "{\n  \"total_scans\": 1248\n}"
-      }
+      { "type": "header", "title": "Həftəlik Dinamika", "subtitle": "Son 7 gün" },
+      { "type": "chart", "title": "Skan Həcmi", "chartType": "area", "chartData": [...] },
+      { "type": "table", "title": "Göstəricilər", "headers": [...], "rows": [...] }
     ]
   }
 }
@@ -351,51 +442,157 @@ AI köməkçisinə mesaj göndərir və dinamik vizual bloklar (`MessageBlock[]`
 
 ---
 
-## 4. 🛠️ Admin & Modellər (`/api/admin`)
+### 🔹 4.6 Autentifikasiya və Profil (`/api/auth`)
 
-### 4.1 GET `/api/admin/models`
-- **Response JSON (200 OK):**
+#### `GET /api/auth/profile`
+İstifadəçi profili və icazələrini qaytarır.
+- **Response (200 OK):**
 ```json
 {
-  "models": [
-    {
-      "id": "mod-1",
-      "name": "STANDARD AI (Cloud Enterprise)",
-      "mode": "STANDARD AI",
-      "status": "Active",
-      "isLocal": false,
-      "lastUpdate": "Bugün 12:00",
-      "provider": "Cloud High-Performance LLM",
-      "description": "Aşağı və orta həssaslıqlı sənədlər üçün model.",
-      "latency": "140ms",
-      "maxContext": "128k tokens"
-    }
-  ]
+  "uid": "dev-user-123",
+  "email": "developer@myguard.internal",
+  "role": "admin",
+  "displayName": "Məğrur Niftiyev",
+  "department": "Security Analytics"
 }
 ```
 
 ---
 
-## ⚡ React (Web Frontend) Nümunə Fetch Kodu
+## 💻 5. Frontend-də `mockApi.ts`-i Real API ilə Əvəzləmək
 
+Web tərəfində `Web/src/api/` qovluğunda birbaşa aşağıdakı modulları yaradaraq mock-dan canlı backend-ə keçə bilərsiniz:
+
+### 📄 `src/api/client.ts`
 ```typescript
-// Web tərəfdən sənəd yükləmək üçün service funksiyası:
-export async function uploadDocumentToBackend(file: File) {
-  const formData = new FormData();
-  formData.append('document', file);
+const BASE_URL = 'http://localhost:3001/api';
 
-  const response = await fetch('http://localhost:3001/api/documents/upload', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-    },
-    body: formData,
+export async function apiClient<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = localStorage.getItem('firebase_token') || '';
+
+  const headers: HeadersInit = {
+    'Accept': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+
+  // FormData üçün Content-Type avtomatik təyin olunur
+  if (!(options.body instanceof FormData)) {
+    (headers as any)['Content-Type'] = 'application/json';
+  }
+
+  const response = await fetch(`${BASE_URL}${endpoint}`, {
+    ...options,
+    headers,
   });
 
   if (!response.ok) {
-    throw new Error('Fayl yüklənərkən xəta baş verdi');
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Sorğu xətası: ${response.status}`);
   }
 
-  return await response.json();
+  return response.json();
 }
+```
+
+### 📄 `src/api/apiService.ts`
+```typescript
+import { apiClient } from './client';
+import {
+  DocumentItem,
+  DetailedAnalysis,
+  ScanStep,
+  AnalysisPipeline,
+  RiskReportMetrics,
+  AgentAction,
+  Intervention,
+  ModelConfig,
+  ChatMessage,
+} from '../types';
+
+export const MyGuardAPI = {
+  // Sənədlər
+  uploadDocument: async (file: File): Promise<{ success: boolean; document: DocumentItem; analysis: DetailedAnalysis }> => {
+    const formData = new FormData();
+    formData.append('document', file);
+    return apiClient('/documents/upload', { method: 'POST', body: formData });
+  },
+
+  getDocuments: async (): Promise<DocumentItem[]> => {
+    const res = await apiClient<{ documents: DocumentItem[] }>('/documents');
+    return res.documents;
+  },
+
+  getDocumentDetails: (id: string): Promise<{ document: DocumentItem; analysis: DetailedAnalysis }> => {
+    return apiClient(`/documents/${id}`);
+  },
+
+  getScanSteps: async (id: string): Promise<ScanStep[]> => {
+    const res = await apiClient<{ steps: ScanStep[] }>(`/documents/${id}/scan-steps`);
+    return res.steps;
+  },
+
+  getPipeline: async (id: string): Promise<AnalysisPipeline> => {
+    const res = await apiClient<{ pipeline: AnalysisPipeline }>(`/documents/${id}/pipeline`);
+    return res.pipeline;
+  },
+
+  deleteDocument: (id: string) => {
+    return apiClient(`/documents/${id}`, { method: 'DELETE' });
+  },
+
+  // Risk Hesabatları
+  getRiskSummary: (): Promise<RiskReportMetrics> => {
+    return apiClient('/reports/risk-summary');
+  },
+
+  // Təhlükəsizlik Əməliyyatları
+  getAgentActions: async (): Promise<AgentAction[]> => {
+    const res = await apiClient<{ actions: AgentAction[] }>('/security/actions');
+    return res.actions;
+  },
+
+  getInterventions: async (): Promise<Intervention[]> => {
+    const res = await apiClient<{ interventions: Intervention[] }>('/security/interventions');
+    return res.interventions;
+  },
+
+  updateActionDecision: (id: string, decision: string) => {
+    return apiClient(`/security/actions/${id}/decision`, {
+      method: 'PATCH',
+      body: JSON.stringify({ decision }),
+    });
+  },
+
+  // Modellər
+  getModels: async (): Promise<ModelConfig[]> => {
+    const res = await apiClient<{ models: ModelConfig[] }>('/admin/models');
+    return res.models;
+  },
+
+  // AI Assistant Çat
+  createChatSession: (title?: string) => {
+    return apiClient('/chat/session', {
+      method: 'POST',
+      body: JSON.stringify({ title }),
+    });
+  },
+
+  getChatHistory: async (sessionId: string): Promise<ChatMessage[]> => {
+    const res = await apiClient<{ messages: ChatMessage[] }>(`/chat/history/${sessionId}`);
+    return res.messages;
+  },
+
+  sendChatMessage: (sessionId: string, message: string, attachmentDocumentId?: string) => {
+    return apiClient<{ success: boolean; userMessage: ChatMessage; assistantMessage: ChatMessage }>('/chat/message', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, message, attachmentDocumentId }),
+    });
+  },
+
+  // İstifadəçi Profili
+  getProfile: () => {
+    return apiClient('/auth/profile');
+  },
+};
 ```

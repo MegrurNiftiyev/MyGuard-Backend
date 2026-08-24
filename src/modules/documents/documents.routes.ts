@@ -6,6 +6,9 @@ import {
   analyzeDocumentLegacy,
   listDocuments,
   getDocumentDetails,
+  getDocumentScanSteps,
+  getDocumentPipeline,
+  getDocumentComparison,
   deleteDocument,
 } from './documents.controller.js';
 
@@ -67,6 +70,39 @@ router.get('/', catchAsync(listDocuments));
  *       - BearerAuth: []
  */
 router.get('/:id', catchAsync(getDocumentDetails));
+
+/**
+ * @openapi
+ * /api/documents/{id}/scan-steps:
+ *   get:
+ *     summary: Get real-time 7-step scan progress for a document
+ *     tags: [Documents]
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get('/:id/scan-steps', catchAsync(getDocumentScanSteps));
+
+/**
+ * @openapi
+ * /api/documents/{id}/pipeline:
+ *   get:
+ *     summary: Get Layer 1, Layer 2, Layer 3 pipeline inspection data
+ *     tags: [Documents]
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get('/:id/pipeline', catchAsync(getDocumentPipeline));
+
+/**
+ * @openapi
+ * /api/documents/{id}/comparison:
+ *   get:
+ *     summary: Get side-by-side OCR vs PDF text comparison and diffs
+ *     tags: [Documents]
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get('/:id/comparison', catchAsync(getDocumentComparison));
 
 /**
  * @openapi
