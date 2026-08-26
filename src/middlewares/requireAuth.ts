@@ -15,6 +15,9 @@ export async function requireAuth(
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // [NOTE]: Real mühitdə (Production) bu blok kommentdə qalmalıdır!
+    // Əgər lokal test üçün token tələbini müvəqqəti söndürmək istəyirsinizsə, aşağıdakı bloku aça bilərsiniz.
+    /*
     if (env.NODE_ENV === 'development' || !isFirebaseInitialized) {
       req.user = {
         uid: 'usr-admin-001',
@@ -23,6 +26,7 @@ export async function requireAuth(
       };
       return next();
     }
+    */
 
     return next(new AppError('Avtorizasiya tələb olunur (Missing Bearer Token)', 401));
   }
@@ -59,7 +63,9 @@ export async function requireAuth(
     console.error('[Auth Middleware] Token verification failed:', firebaseErr);
   }
 
-  // 3. Fallback for development if token exists
+  // [NOTE]: Real mühitdə (Production) bu blok kommentdə qalmalıdır!
+  // Əgər tokenin səhv olmasına baxmayaraq test məqsədilə bypass etmək istəyirsinizsə, aça bilərsiniz.
+  /*
   if (env.NODE_ENV === 'development' || !isFirebaseInitialized) {
     req.user = {
       uid: 'usr-admin-001',
@@ -68,6 +74,8 @@ export async function requireAuth(
     };
     return next();
   }
+  */
 
+  // 3. Əgər token tapılmazsa və ya keçərsizdirsə, xəta qaytar.
   next(new AppError('Etibarsız və ya vaxtı bitmiş token', 401));
 }

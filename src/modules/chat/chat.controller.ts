@@ -3,8 +3,13 @@ import { AuthenticatedRequest } from '../../types/index.js';
 import {
   createOrGetChatSession,
   getChatHistory,
-  processUserMessage,
+  logSmallChatMessage,
+  callLlmSmall,
+  callLlmLarge,
+  appendToHistory,
 } from './chat.service.js';
+import { getSystemPromptFor } from './prompts.js';
+import { SendChatMessageRequest, ChatMode, SmallChatMessage, LargeChatMessage } from '../../types/index.js';
 import { AppError } from '../../errors/AppError.js';
 
 export async function createSession(req: AuthenticatedRequest, res: Response) {
@@ -21,23 +26,29 @@ export async function getHistory(req: AuthenticatedRequest, res: Response) {
 }
 
 export async function sendMessage(req: AuthenticatedRequest, res: Response) {
-  const userId = req.user?.uid || 'dev-user-123';
-  const { sessionId, message, attachmentDocumentId } = req.body;
+  const { chatMode, screenDestination, message, sessionId } = req.body as SendChatMessageRequest;
 
-  if (!sessionId || !message) {
-    throw new AppError('sessionId və message məcburidir', 400);
+  if (!chatMode || !screenDestination || !message) {
+    throw new AppError('chatMode, screenDestination və message məcburidir', 400);
   }
 
-  const result = await processUserMessage(
-    userId,
-    sessionId,
-    message,
-    attachmentDocumentId
-  );
+  const systemPrompt = getSystemPromptFor(screenDestination);
 
-  res.json({
-    success: true,
-    userMessage: result.userMessage,
-    assistantMessage: result.assistantMessage,
-  });
+  if (chatMode === ChatMode.SMALL_CHAT) {
+    const reply = await callLlmSmall(systemPrompt, message);
+    await logSmallChatMessage({ screenDestination, message, reply }); // fire-and-forget
+    const response: SmallChatMessage = { chatMode, text: reply };
+    return res.json(response);
+  }
+
+  // LARGE_CHAT
+  if (!sessionId) {
+    throw new AppError('LARGE_CHAT üçün sessionId məcburidir', 400);
+  }
+
+  const history = await getChatHistory(sessionId, 10);
+  const blocks = await callLlmLarge(systemPrompt, history, message);
+  const reply: LargeChatMessage = await appendToHistory(sessionId, message, blocks);
+  
+  return res.json(reply);
 }

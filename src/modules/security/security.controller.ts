@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getAgentActionsList, getInterventionsList, updateActionDecision } from './security.service.js';
+import { getAgentActionsList, updateActionDecision } from './security.service.js';
 import { AppError } from '../../errors/AppError.js';
 
 export async function listAgentActions(req: Request, res: Response) {
@@ -7,16 +7,11 @@ export async function listAgentActions(req: Request, res: Response) {
   res.json({ actions });
 }
 
-export async function listInterventions(req: Request, res: Response) {
-  const interventions = await getInterventionsList();
-  res.json({ interventions });
-}
-
 export async function updateDecision(req: Request, res: Response) {
   const actionId = String(req.params.id);
   const { decision } = req.body;
 
-  if (!['ALLOWED', 'BLOCKED', 'REQUIRES_CONFIRMATION'].includes(decision)) {
+  if (!['ALLOWED', 'BLOCKED'].includes(decision)) {
     throw new AppError('Yolverilməz qərar statusu', 400);
   }
 

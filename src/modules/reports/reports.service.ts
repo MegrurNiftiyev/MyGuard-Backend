@@ -1,6 +1,6 @@
-import { RiskReportMetrics } from './reports.schema.js';
+import { RiskDashboardStats } from './reports.schema.js';
 
-export async function getRiskSummaryReport(userId: string): Promise<RiskReportMetrics> {
+export async function getRiskSummaryReport(userId: string): Promise<RiskDashboardStats> {
   return {
     totalScanned: 1420,
     safeCount: 1180,

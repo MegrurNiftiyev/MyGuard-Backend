@@ -1,6 +1,6 @@
 import { db, isFirebaseInitialized } from '../../config/firebase.js';
 import { COLLECTIONS } from '../../config/collections.js';
-import { ModelConfig, AgentAction } from './admin.schema.js';
+import { ModelConfig, AgentActivityLog } from './admin.schema.js';
 
 const defaultModels: ModelConfig[] = [
   {
@@ -29,9 +29,10 @@ const defaultModels: ModelConfig[] = [
   },
 ];
 
-const defaultAgentActions: AgentAction[] = [
+const defaultAgentActions: AgentActivityLog[] = [
   {
     id: 'act-101',
+    agent: 'Mail Gateway Agent',
     action: 'Send document by email',
     file: 'internal_salary_report.pdf',
     destination: 'external@gmail.com',
@@ -42,6 +43,7 @@ const defaultAgentActions: AgentAction[] = [
   },
   {
     id: 'act-102',
+    agent: 'Cloud Sync Agent',
     action: 'Upload confidential file',
     file: 'Defense_Strategy_2026.docx',
     destination: 'External cloud server (api.untrusted.com)',
@@ -52,6 +54,7 @@ const defaultAgentActions: AgentAction[] = [
   },
   {
     id: 'act-103',
+    agent: 'Data Fetcher Agent',
     action: 'Query Knowledge Base',
     file: 'Public_HR_Policy_2025.pdf',
     destination: 'Internal Vector Database',
@@ -79,7 +82,7 @@ export async function getModelVersions(): Promise<ModelConfig[]> {
   return defaultModels;
 }
 
-export async function getAgentActions(): Promise<AgentAction[]> {
+export async function getAgentActions(): Promise<AgentActivityLog[]> {
   return defaultAgentActions;
 }
 

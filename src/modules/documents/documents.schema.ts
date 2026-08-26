@@ -1,3 +1,3 @@
-import { DocumentItem, DetailedAnalysis, ThreatItem, RiskStatus } from '../../types/index.js';
+import { Document, DocumentListItem, ThreatItem, RiskStatus, ScanStep, ScanSocketEvent } from '../../types/index.js';
 
-export { DocumentItem, DetailedAnalysis, ThreatItem, RiskStatus };
+export { Document, DocumentListItem, ThreatItem, RiskStatus, ScanStep, ScanSocketEvent };

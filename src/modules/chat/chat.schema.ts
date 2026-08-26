@@ -1,3 +1,3 @@
-import { ChatMessage, MessageBlock, StructuredAiAnalysis } from '../../types/index.js';
+import { SmallChatMessage, LargeChatMessage, MessageBlock, StructuredAiAnalysis } from '../../types/index.js';
 
-export { ChatMessage, MessageBlock, StructuredAiAnalysis };
+export { SmallChatMessage, LargeChatMessage, MessageBlock, StructuredAiAnalysis };

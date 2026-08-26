@@ -5,8 +5,7 @@ import {
   getUserDocuments,
   getDocumentById,
   deleteDocumentRecord,
-  getScanStepsForDocument,
-  getPipelineForDocument,
+  updateDocumentLabel,
 } from './documents.service.js';
 import { AppError } from '../../errors/AppError.js';
 
@@ -28,40 +27,9 @@ export async function uploadDocument(req: AuthenticatedRequest, res: Response) {
   res.json({
     success: true,
     document: result.document,
-    analysis: result.analysis,
   });
 }
 
-export async function analyzeDocumentLegacy(req: AuthenticatedRequest, res: Response) {
-  if (!req.file) {
-    throw new AppError('Fayl tapılmadı', 400);
-  }
-
-  const userId = req.user?.uid || 'dev-user-123';
-  const result = await processAndSaveDocument(
-    req.file.buffer,
-    req.file.originalname,
-    req.file.mimetype,
-    userId
-  );
-
-  res.json({
-    documentId: result.document.id,
-    status: result.analysis.riskStatus,
-    layer1_ocrTextMatch: {
-      matchPercent: result.analysis.ocrPdfMatch,
-      hiddenTextDetected: result.analysis.hiddenTextDetected,
-    },
-    layer2_classification: {
-      confidence: result.analysis.promptInjectionProb / 100,
-      label: result.analysis.riskStatus === 'safe' ? 'safe' : 'injection',
-    },
-    layer3_llmAnalysis: {
-      explanation: result.analysis.plainExplanation,
-    },
-    overallRiskScore: result.analysis.riskScore,
-  });
-}
 
 export async function listDocuments(req: AuthenticatedRequest, res: Response) {
   const userId = req.user?.uid || 'dev-user-123';
@@ -71,44 +39,39 @@ export async function listDocuments(req: AuthenticatedRequest, res: Response) {
 
 export async function getDocumentDetails(req: AuthenticatedRequest, res: Response) {
   const docId = String(req.params.id);
-  const data = await getDocumentById(docId);
+  const document = await getDocumentById(docId);
 
-  if (!data.document) {
+  if (!document) {
     throw new AppError('Sənəd tapılmadı', 404);
   }
 
-  res.json(data);
+  res.json(document);
 }
 
-export async function getDocumentScanSteps(req: AuthenticatedRequest, res: Response) {
-  const docId = String(req.params.id);
-  const steps = await getScanStepsForDocument(docId);
-  res.json({ documentId: docId, steps });
-}
-
-export async function getDocumentPipeline(req: AuthenticatedRequest, res: Response) {
-  const docId = String(req.params.id);
-  const pipeline = await getPipelineForDocument(docId);
-  res.json({ pipeline });
-}
 
 export async function getDocumentComparison(req: AuthenticatedRequest, res: Response) {
   const docId = String(req.params.id);
-  const data = await getDocumentById(docId);
+  const document = await getDocumentById(docId);
 
-  if (!data.analysis) {
-    throw new AppError('Analiz məlumatı tapılmadı', 404);
+  if (!document) {
+    throw new AppError('Sənəd tapılmadı', 404);
   }
 
+  // Fallback / mock content for text layers, since we don't save raw text in the new Document model
+  // but the frontend might still expect it.
   res.json({
     documentId: docId,
-    documentName: data.analysis.documentName,
-    ocrText: data.analysis.ocrText,
-    pdfTextLayer: data.analysis.pdfTextLayer,
-    ocrPdfMatch: data.analysis.ocrPdfMatch,
-    hiddenTextDetected: data.analysis.hiddenTextDetected,
-    flaggedSnippet: data.analysis.flaggedSnippet,
-    flaggedMetadata: data.analysis.flaggedMetadata,
+    documentName: document.fileName,
+    ocrText: `Mock OCR Text for ${document.fileName}`,
+    pdfTextLayer: `Mock PDF Layer for ${document.fileName}`,
+    ocrPdfMatch: document.layer1_ocrTextMatch?.matchPercent || 100,
+    hiddenTextDetected: document.layer1_ocrTextMatch?.hiddenTextDetected || false,
+    flaggedSnippet: document.layer1_ocrTextMatch?.extraTextSegments?.[0] || '',
+    flaggedMetadata: {
+      pageNumber: 1,
+      visibilityType: 'PDF Layer Only',
+      location: 'Mock Location'
+    },
   });
 }
 
@@ -116,4 +79,33 @@ export async function deleteDocument(req: AuthenticatedRequest, res: Response) {
   const docId = String(req.params.id);
   await deleteDocumentRecord(docId);
   res.json({ success: true, message: 'Sənəd uğurla silindi' });
+}
+
+export async function cleanInjection(req: AuthenticatedRequest, res: Response) {
+  const docId = String(req.params.id);
+  
+  // Hələlik sadəcə mock response qaytarırıq.
+  res.json({
+    success: true,
+    message: 'Sənəddəki prompt injection təhdidləri təmizləndi.',
+    cleanedDocumentId: docId,
+    downloadUrl: `https://mock-storage.myguard.az/cleaned/${docId}.pdf`
+  });
+}
+
+export async function labelByUser(req: AuthenticatedRequest, res: Response) {
+  const docId = String(req.params.id);
+  const { isContainInjection } = req.body;
+
+  if (typeof isContainInjection !== 'boolean') {
+    throw new AppError('isContainInjection parametri mütləq və boolean tipində olmalıdır', 400);
+  }
+
+  const document = await updateDocumentLabel(docId, isContainInjection);
+
+  res.json({
+    success: true,
+    message: 'Sənədin statusu istifadəçi tərəfindən uğurla yeniləndi.',
+    document,
+  });
 }

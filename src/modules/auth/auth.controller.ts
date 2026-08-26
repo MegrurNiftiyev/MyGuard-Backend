@@ -5,7 +5,6 @@ import {
   loginUser,
   refreshAccessToken,
   loginWithOAuth,
-  getUserProfile,
 } from './auth.service.js';
 import { AppError } from '../../errors/AppError.js';
 
@@ -92,14 +91,7 @@ export async function loginSima(req: Request, res: Response) {
   res.json(result);
 }
 
-/**
- * Get authenticated user profile
- */
-export async function getProfile(req: AuthenticatedRequest, res: Response) {
-  const uid = req.user?.uid || 'usr-admin-001';
-  const profile = await getUserProfile(uid);
-  res.json({ success: true, user: profile });
-}
+
 
 /**
  * Logout

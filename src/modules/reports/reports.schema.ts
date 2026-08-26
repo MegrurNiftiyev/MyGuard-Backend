@@ -1,3 +1,3 @@
-import { RiskReportMetrics } from '../../types/index.js';
+import { RiskDashboardStats } from '../../types/index.js';
 
-export { RiskReportMetrics };
+export { RiskDashboardStats };

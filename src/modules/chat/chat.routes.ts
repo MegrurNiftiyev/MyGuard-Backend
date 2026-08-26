@@ -10,6 +10,24 @@ const router = Router();
 
 /**
  * @openapi
+ * /api/chat/history/{sessionId}:
+ *   get:
+ *     summary: Get chat message history for a session
+ *     tags: [AI Assistant]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: sessionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Chat Session ID
+ */
+router.get('/history/:sessionId', catchAsync(getHistory));
+
+/**
+ * @openapi
  * /api/chat/session:
  *   post:
  *     summary: Create a new AI Assistant chat session
@@ -18,17 +36,6 @@ const router = Router();
  *       - BearerAuth: []
  */
 router.post('/session', catchAsync(createSession));
-
-/**
- * @openapi
- * /api/chat/history/{sessionId}:
- *   get:
- *     summary: Get chat message history for a session
- *     tags: [AI Assistant]
- *     security:
- *       - BearerAuth: []
- */
-router.get('/history/:sessionId', catchAsync(getHistory));
 
 /**
  * @openapi

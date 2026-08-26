@@ -7,7 +7,6 @@ import {
   refresh,
   loginMyGov,
   loginSima,
-  getProfile,
   logout,
 } from './auth.controller.js';
 
@@ -98,43 +97,23 @@ router.post('/refresh', catchAsync(refresh));
 
 /**
  * @openapi
- * /api/auth/oauth/mygov:
+ * /api/auth/mygov:
  *   post:
  *     summary: myGov QR / SSO Login
  *     tags: [Authentication]
  */
-router.post('/oauth/mygov', catchAsync(loginMyGov));
+router.post('/mygov', catchAsync(loginMyGov));
 
 /**
  * @openapi
- * /api/auth/oauth/sima:
+ * /api/auth/sima:
  *   post:
  *     summary: SİMA QR / SSO Login
  *     tags: [Authentication]
  */
-router.post('/oauth/sima', catchAsync(loginSima));
+router.post('/sima', catchAsync(loginSima));
 
-/**
- * @openapi
- * /api/auth/profile:
- *   get:
- *     summary: Get current authenticated user profile
- *     tags: [Authentication]
- *     security:
- *       - BearerAuth: []
- */
-router.get('/profile', requireAuth, catchAsync(getProfile));
 
-/**
- * @openapi
- * /api/auth/me:
- *   get:
- *     summary: Get current authenticated user profile (alias)
- *     tags: [Authentication]
- *     security:
- *       - BearerAuth: []
- */
-router.get('/me', requireAuth, catchAsync(getProfile));
 
 /**
  * @openapi

@@ -11,35 +11,92 @@ export interface AuthenticatedRequest extends Request {
 }
 
 export type RiskStatus = 'safe' | 'suspicious' | 'high_risk' | 'blocked';
-export type StepStatus = 'processing' | 'completed' | 'warning' | 'failed';
 export type ActionDecision = 'ALLOWED' | 'BLOCKED' | 'REQUIRES_CONFIRMATION';
 export type SensitivityLevel = 'Low' | 'Medium' | 'High' | 'Critical';
 export type AIModelMode = 'STANDARD AI' | 'CONFIDENTIAL AI';
 
-export interface DocumentItem {
+export type ScanStep =
+  | 'DOCUMENT_UPLOADED'
+  | 'PDF_TEXT_EXTRACTION'
+  | 'OCR_ANALYSIS'
+  | 'TEXT_COMPARISON'
+  | 'HIDDEN_TEXT_DETECTION'
+  | 'PROMPT_INJECTION_ANALYSIS'
+  | 'RISK_ASSESSMENT';
+
+export interface Document {
   id: string;
-  name: string;
-  fileType: string;
-  size: string;
-  uploadTime: string;
-  riskScore: number; // 0 - 100
-  status: RiskStatus;
-  ocrPdfMatch: number; // percentage
-  hiddenTextDetected: boolean;
-  promptInjectionProb: number; // percentage
-  department: string;
-  flaggedCount: number;
-  category: string;
-  fileUrl?: string;
+  ownerId: string;
+
+  fileName: string;
+  fileSizeBytes: number;
+  fileType: 'pdf' | 'docx' | 'txt' | string;
+  uploadUrl: string;
+
+  uploadedAt: string;
+  scanStartedAt: string | null;
+  scanFinishedAt: string | null;
+  scanDurationMs: number | null;
+
+  currentStep: ScanStep | 'COMPLETED' | 'FAILED';
+  stepStatus: 'pending' | 'active' | 'completed' | 'error';
+  stepHistory: {
+    step: ScanStep;
+    startedAt: string;
+    finishedAt: string | null;
+    status: 'completed' | 'error';
+  }[];
+
+  layer1_ocrTextMatch: {
+    matchPercent: number;
+    hiddenTextDetected: boolean;
+    extraTextSegments: string[];
+    status: 'clean' | 'suspicious';
+  } | null;
+
+  layer2_classification: {
+    label: 'safe' | 'suspicious' | 'injection';
+    confidence: number;
+    categories: string[];
+  } | null;
+
+  layer3_llmReview: {
+    used: boolean;
+    explanation: string | null;
+  } | null;
+
+  finalRiskScore: number | null;
+  finalStatus: 'safe' | 'suspicious' | 'high_risk' | null;
+
+  reviewedByUser: boolean;
+  userReviewLabel: boolean | null;
+  isContainInjection: boolean;
+
+  errorDetail: string | null;
 }
 
-export interface ScanStep {
-  stepNumber: number;
-  title: string;
-  description: string;
-  status: StepStatus;
+export interface DocumentListItem {
+  id: string;
+  fileName: string;
+  uploadedAt: string;
+  finalStatus: 'safe' | 'suspicious' | 'high_risk' | null;
+  finalRiskScore: number | null;
+  currentStep: ScanStep | 'COMPLETED' | 'FAILED';
 }
 
+export interface ScanSocketEvent {
+  response: 'success' | 'error';
+  step: ScanStep;
+  message: string;
+  fileData: Pick<Document,
+    | 'currentStep' | 'stepStatus'
+    | 'layer1_ocrTextMatch' | 'layer2_classification' | 'layer3_llmReview'
+    | 'finalRiskScore' | 'finalStatus' | 'isContainInjection'
+    | 'scanStartedAt' | 'scanFinishedAt' | 'scanDurationMs'
+  >;
+}
+
+// Keeping ThreatItem, MessageBlock etc. intact below if needed.
 export interface ThreatItem {
   id: string;
   type: 'Hidden Text' | 'Instruction Override' | 'Ranking Manipulation' | 'External Action Request';
@@ -49,28 +106,6 @@ export interface ThreatItem {
   location: string;
   pageNumber: number;
   severity: 'low' | 'medium' | 'high' | 'critical';
-}
-
-export interface DetailedAnalysis {
-  documentId: string;
-  documentName: string;
-  fileType: string;
-  uploadTime: string;
-  riskStatus: RiskStatus;
-  riskScore: number;
-  ocrPdfMatch: number;
-  hiddenTextDetected: boolean;
-  promptInjectionProb: number;
-  plainExplanation: string;
-  threats: ThreatItem[];
-  ocrText: string;
-  pdfTextLayer: string;
-  flaggedSnippet: string;
-  flaggedMetadata: {
-    pageNumber: number;
-    visibilityType: string;
-    location: string;
-  };
 }
 
 export interface StructuredAiAnalysis {
@@ -129,14 +164,36 @@ export interface MessageBlock {
   listType?: 'numbered' | 'bullet';
 }
 
-export interface ChatMessage {
-  id: string;
+export enum ChatMode {
+  SMALL_CHAT = 'SMALL_CHAT',
+  LARGE_CHAT = 'LARGE_CHAT',
+}
+
+export enum ScreenDestination {
+  HOME_SCREEN = 'HOME_SCREEN',
+  DOCUMENTS_SCREEN = 'DOCUMENTS_SCREEN',
+  SCAN_SCREEN = 'SCAN_SCREEN',
+  SETTINGS_SCREEN = 'SETTINGS_SCREEN',
+  AI_SCREEN = 'AI_SCREEN',
+}
+
+export interface SendChatMessageRequest {
+  chatMode: ChatMode;
+  screenDestination: ScreenDestination;
+  message: string;
   sessionId?: string;
-  sender: 'user' | 'assistant';
+}
+
+export interface SmallChatMessage {
+  chatMode: ChatMode.SMALL_CHAT;
+  text: string;
+}
+
+export interface LargeChatMessage {
+  id: string;
+  sender: 'assistant' | 'user';
   timestamp: string;
-  text?: string;
-  structuredAnalysis?: StructuredAiAnalysis;
-  blocks?: MessageBlock[];
+  blocks: MessageBlock[];
 }
 
 export interface ModelConfig {
@@ -152,18 +209,19 @@ export interface ModelConfig {
   maxContext: string;
 }
 
-export interface AgentAction {
+export interface AgentActivityLog {
   id: string;
+  agent: string;
   action: string;
   file: string;
   destination: string;
   sensitivity: SensitivityLevel;
-  decision: ActionDecision;
+  decision: 'ALLOWED' | 'BLOCKED';
   timestamp: string;
   reason: string;
 }
 
-export interface RiskReportMetrics {
+export interface RiskDashboardStats {
   totalScanned: number;
   safeCount: number;
   suspiciousCount: number;
@@ -180,29 +238,27 @@ export interface Layer1Metrics {
   extraTextSegments?: string[];
 }
 
-export interface AnalysisPipeline {
+export interface ScanStepCard {
+  stepNumber: number;
+  title: string;
+  description: string;
+  status: 'pending' | 'active' | 'completed' | 'error' | 'warning';
+}
+
+export interface DocumentThreatReport {
   documentId: string;
-  layer1_ocrTextMatch: Layer1Metrics;
-  layer2_classification: {
-    confidence: number;
-    label: 'safe' | 'suspicious' | 'injection';
-    categories: string[];
-  };
-  layer3_llmReview: {
-    used: boolean;
-    explanation: string | null;
-  };
-  finalRiskScore: number;
-  finalStatus: 'safe' | 'suspicious' | 'high_risk';
+  documentName: string;
+  fileType: string;
+  uploadTime: string;
+  riskStatus: RiskStatus;
+  riskScore: number;
+  ocrPdfMatch: number;
+  hiddenTextDetected: boolean;
+  promptInjectionProb: number;
+  plainExplanation: string;
+  threats: ThreatItem[];
+  ocrText?: string;
+  pdfTextLayer?: string;
+  flaggedSnippet?: string;
+  flaggedMetadata?: any;
 }
-
-export interface Intervention {
-  id: string;
-  agent: string;
-  action: string;
-  file: string;
-  destination: string;
-  status: 'blocked' | 'allowed';
-  timestamp: string;
-}
-

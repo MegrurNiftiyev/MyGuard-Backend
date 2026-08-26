@@ -1,3 +1,3 @@
-import { AgentAction, Intervention } from '../../types/index.js';
+import { AgentActivityLog } from '../../types/index.js';
 
-export { AgentAction, Intervention };
+export { AgentActivityLog };

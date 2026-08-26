@@ -1,3 +1,3 @@
-import { ModelConfig, AgentAction } from '../../types/index.js';
+import { ModelConfig, AgentActivityLog } from '../../types/index.js';
 
-export { ModelConfig, AgentAction };
+export { ModelConfig, AgentActivityLog };

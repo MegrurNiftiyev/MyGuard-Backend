@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { catchAsync } from '../../utils/catchAsync.js';
-import { listAgentActions, listInterventions, updateDecision } from './security.controller.js';
+import { listAgentActions, updateDecision } from './security.controller.js';
 
 const router = Router();
 
@@ -15,16 +15,6 @@ const router = Router();
  */
 router.get('/actions', catchAsync(listAgentActions));
 
-/**
- * @openapi
- * /api/security/interventions:
- *   get:
- *     summary: List blocked and allowed interventions
- *     tags: [Security Actions]
- *     security:
- *       - BearerAuth: []
- */
-router.get('/interventions', catchAsync(listInterventions));
 
 /**
  * @openapi
@@ -34,6 +24,13 @@ router.get('/interventions', catchAsync(listInterventions));
  *     tags: [Security Actions]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Action ID
  */
 router.patch('/actions/:id/decision', catchAsync(updateDecision));
 

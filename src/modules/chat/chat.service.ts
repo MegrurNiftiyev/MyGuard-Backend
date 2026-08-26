@@ -1,7 +1,13 @@
 import { db, isFirebaseInitialized } from '../../config/firebase.js';
 import { COLLECTIONS } from '../../config/collections.js';
-import { ChatMessage, MessageBlock, StructuredAiAnalysis } from '../../types/index.js';
-import { MYGUARD_AI_SYSTEM_INSTRUCTION } from './chat.prompt.js';
+import { 
+  SmallChatMessage, 
+  LargeChatMessage, 
+  MessageBlock, 
+  StructuredAiAnalysis, 
+  ScreenDestination 
+} from '../../types/index.js';
+import { getSystemPromptFor } from './prompts.js';
 
 export interface ChatSession {
   id: string;
@@ -11,10 +17,7 @@ export interface ChatSession {
   updatedAt: string;
 }
 
-const memorySessions = new Map<string, ChatSession>();
-const memoryMessages = new Map<string, ChatMessage[]>();
-
-export { MYGUARD_AI_SYSTEM_INSTRUCTION };
+const memoryMessages = new Map<string, LargeChatMessage[]>();
 
 export async function createOrGetChatSession(userId: string, title?: string): Promise<ChatSession> {
   const sessionId = 'session-' + Date.now();
@@ -36,29 +39,94 @@ export async function createOrGetChatSession(userId: string, title?: string): Pr
     }
   }
 
-  memorySessions.set(sessionId, session);
-  memoryMessages.set(sessionId, []);
   return session;
 }
 
-export async function getChatHistory(sessionId: string): Promise<ChatMessage[]> {
+export async function getChatHistory(sessionId: string, limitCount: number = 10): Promise<LargeChatMessage[]> {
   if (isFirebaseInitialized && db) {
     try {
       const snapshot = await db
         .collection(COLLECTIONS.CHAT_MESSAGES)
         .where('sessionId', '==', sessionId)
-        .orderBy('timestamp', 'asc')
+        .orderBy('timestamp', 'desc')
+        .limit(limitCount)
         .get();
 
-      const messages: ChatMessage[] = [];
-      snapshot.forEach((doc: any) => messages.push(doc.data() as ChatMessage));
-      if (messages.length > 0) return messages;
+      const messages: LargeChatMessage[] = [];
+      snapshot.forEach((doc: any) => messages.push(doc.data() as LargeChatMessage));
+      if (messages.length > 0) return messages.reverse(); // desc for limit, then reverse to chronological
     } catch (err) {
       console.warn('[Chat Service] Firestore get messages fallback:', err);
     }
   }
 
-  return memoryMessages.get(sessionId) || [];
+  const msgs = memoryMessages.get(sessionId) || [];
+  return msgs.slice(-limitCount);
+}
+
+export interface SmallChatLogEntry {
+  screenDestination: ScreenDestination;
+  message: string;
+  reply: string;
+}
+
+export async function logSmallChatMessage(entry: SmallChatLogEntry) {
+  if (isFirebaseInitialized && db) {
+    db.collection('small_chat_logs').add({
+      ...entry,
+      timestamp: new Date().toISOString(),
+    }).catch(err => {
+      console.warn('[Chat Service] Failed to log small chat message:', err);
+    });
+  }
+}
+
+export async function callLlmSmall(systemPrompt: string, message: string): Promise<string> {
+  // In a real scenario, this would call the actual LLM with systemPrompt and message
+  // For now, return a mock response that obeys the 1-3 sentences rule.
+  return `Bu xüsusi sorğunuz üçün test cavabıdır. Sistem hazırda mock rejimindədir və real LLM-ə qoşulmayıb. Sorğunuz qeydə alındı.`;
+}
+
+export async function callLlmLarge(systemPrompt: string, history: LargeChatMessage[], message: string): Promise<MessageBlock[]> {
+  // In a real scenario, this would call the actual LLM with the history and schema constraint
+  // For now, return the dynamic response block
+  const dynamicResponse = constructDynamicAiResponse(message);
+  return dynamicResponse.blocks;
+}
+
+export async function appendToHistory(sessionId: string, userMessageText: string, blocks: MessageBlock[]): Promise<LargeChatMessage> {
+  const now = new Date().toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' });
+  const userMsgId = 'msg-' + Date.now();
+  const assistantMsgId = 'msg-' + (Date.now() + 1);
+
+  const userMessage: LargeChatMessage = {
+    id: userMsgId,
+    sender: 'user',
+    timestamp: now,
+    blocks: [{ type: 'text', content: userMessageText }],
+  };
+
+  const assistantMessage: LargeChatMessage = {
+    id: assistantMsgId,
+    sender: 'assistant',
+    timestamp: now,
+    blocks,
+  };
+
+  if (isFirebaseInitialized && db) {
+    try {
+      await db.collection(COLLECTIONS.CHAT_MESSAGES).doc(userMsgId).set({ ...userMessage, sessionId });
+      await db.collection(COLLECTIONS.CHAT_MESSAGES).doc(assistantMsgId).set({ ...assistantMessage, sessionId });
+    } catch (err) {
+      console.warn('[Chat Service] Firestore save message error:', err);
+    }
+  }
+
+  const existingMsgs = memoryMessages.get(sessionId) || [];
+  existingMsgs.push(userMessage, assistantMessage);
+  memoryMessages.set(sessionId, existingMsgs);
+
+  return assistantMessage;
 }
 
 /**
@@ -246,48 +314,4 @@ export function constructDynamicAiResponse(
   };
 }
 
-export async function processUserMessage(
-  userId: string,
-  sessionId: string,
-  userMessageText: string,
-  attachmentDocumentId?: string
-): Promise<{ userMessage: ChatMessage; assistantMessage: ChatMessage }> {
-  const now = new Date().toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' });
-  const userMsgId = 'msg-' + Date.now();
-  const assistantMsgId = 'msg-' + (Date.now() + 1);
 
-  const userMessage: ChatMessage = {
-    id: userMsgId,
-    sessionId,
-    sender: 'user',
-    timestamp: now,
-    text: userMessageText,
-  };
-
-  const dynamicResponse = constructDynamicAiResponse(userMessageText, attachmentDocumentId);
-
-  const assistantMessage: ChatMessage = {
-    id: assistantMsgId,
-    sessionId,
-    sender: 'assistant',
-    timestamp: now,
-    text: dynamicResponse.text,
-    structuredAnalysis: dynamicResponse.structuredAnalysis,
-    blocks: dynamicResponse.blocks,
-  };
-
-  if (isFirebaseInitialized && db) {
-    try {
-      await db.collection(COLLECTIONS.CHAT_MESSAGES).doc(userMsgId).set(userMessage);
-      await db.collection(COLLECTIONS.CHAT_MESSAGES).doc(assistantMsgId).set(assistantMessage);
-    } catch (err) {
-      console.warn('[Chat Service] Firestore save message error:', err);
-    }
-  }
-
-  const existingMsgs = memoryMessages.get(sessionId) || [];
-  existingMsgs.push(userMessage, assistantMessage);
-  memoryMessages.set(sessionId, existingMsgs);
-
-  return { userMessage, assistantMessage };
-}

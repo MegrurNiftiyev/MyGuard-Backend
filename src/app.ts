@@ -12,6 +12,7 @@ import reportRoutes from './modules/reports/reports.routes.js';
 import chatRoutes from './modules/chat/chat.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
 import securityRoutes from './modules/security/security.routes.js';
+import usersRoutes from './modules/users/users.routes.js';
 
 const app = express();
 
@@ -21,7 +22,18 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Swagger Interactive API Documentation UI
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  swaggerOptions: {
+    operationsSorter: (a: any, b: any) => {
+      const methodsOrder = ["get", "post", "patch", "put", "delete", "options", "trace"];
+      let result = methodsOrder.indexOf(a.get("method")) - methodsOrder.indexOf(b.get("method"));
+      if (result === 0) {
+        result = a.get("path").localeCompare(b.get("path"));
+      }
+      return result;
+    }
+  }
+}));
 
 // Health & Status Endpoint
 /**
@@ -49,14 +61,13 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 
 // Protected Core Application Routes
+app.use('/api/users', requireAuth, usersRoutes);
 app.use('/api/documents', requireAuth, documentRoutes);
 app.use('/api/reports', requireAuth, reportRoutes);
 app.use('/api/chat', requireAuth, chatRoutes);
 app.use('/api/admin', requireAuth, adminRoutes);
 app.use('/api/security', requireAuth, securityRoutes);
 
-// Legacy Single-Endpoint Support
-app.post('/api/analyze', requireAuth, documentRoutes);
 
 // 404 Route Handler
 app.use((req, res) => {

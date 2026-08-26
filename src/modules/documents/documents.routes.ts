@@ -3,16 +3,63 @@ import { upload } from '../../middlewares/upload.js';
 import { catchAsync } from '../../utils/catchAsync.js';
 import {
   uploadDocument,
-  analyzeDocumentLegacy,
   listDocuments,
   getDocumentDetails,
-  getDocumentScanSteps,
-  getDocumentPipeline,
   getDocumentComparison,
   deleteDocument,
+  cleanInjection,
+  labelByUser,
 } from './documents.controller.js';
 
 const router = Router();
+
+/**
+ * @openapi
+ * /api/documents:
+ *   get:
+ *     summary: Get all uploaded documents for the authenticated user
+ *     tags: [Documents]
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get('/', catchAsync(listDocuments));
+
+/**
+ * @openapi
+ * /api/documents/{id}:
+ *   get:
+ *     summary: Get details and security analysis for a specific document
+ *     tags: [Documents]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Document ID
+ */
+router.get('/:id', catchAsync(getDocumentDetails));
+
+
+/**
+ * @openapi
+ * /api/documents/{id}/comparison:
+ *   get:
+ *     summary: Get side-by-side OCR vs PDF text comparison and diffs
+ *     tags: [Documents]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Document ID
+ */
+router.get('/:id/comparison', catchAsync(getDocumentComparison));
 
 /**
  * @openapi
@@ -40,69 +87,49 @@ router.post('/upload', upload.single('document'), catchAsync(uploadDocument));
 
 /**
  * @openapi
- * /api/analyze:
+ * /api/documents/{id}/clean-injection:
  *   post:
- *     summary: Legacy analysis endpoint (alias for document upload)
+ *     summary: Clean injected prompts from a document
  *     tags: [Documents]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Document ID
  */
-router.post('/analyze', upload.single('document'), catchAsync(analyzeDocumentLegacy));
+router.post('/:id/clean-injection', catchAsync(cleanInjection));
 
 /**
  * @openapi
- * /api/documents:
- *   get:
- *     summary: Get all uploaded documents for the authenticated user
+ * /api/documents/{id}/label-by-user:
+ *   patch:
+ *     summary: User overrides or confirms if the document contains injection
  *     tags: [Documents]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Document ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [isContainInjection]
+ *             properties:
+ *               isContainInjection:
+ *                 type: boolean
  */
-router.get('/', catchAsync(listDocuments));
-
-/**
- * @openapi
- * /api/documents/{id}:
- *   get:
- *     summary: Get details and security analysis for a specific document
- *     tags: [Documents]
- *     security:
- *       - BearerAuth: []
- */
-router.get('/:id', catchAsync(getDocumentDetails));
-
-/**
- * @openapi
- * /api/documents/{id}/scan-steps:
- *   get:
- *     summary: Get real-time 7-step scan progress for a document
- *     tags: [Documents]
- *     security:
- *       - BearerAuth: []
- */
-router.get('/:id/scan-steps', catchAsync(getDocumentScanSteps));
-
-/**
- * @openapi
- * /api/documents/{id}/pipeline:
- *   get:
- *     summary: Get Layer 1, Layer 2, Layer 3 pipeline inspection data
- *     tags: [Documents]
- *     security:
- *       - BearerAuth: []
- */
-router.get('/:id/pipeline', catchAsync(getDocumentPipeline));
-
-/**
- * @openapi
- * /api/documents/{id}/comparison:
- *   get:
- *     summary: Get side-by-side OCR vs PDF text comparison and diffs
- *     tags: [Documents]
- *     security:
- *       - BearerAuth: []
- */
-router.get('/:id/comparison', catchAsync(getDocumentComparison));
+router.patch('/:id/label-by-user', catchAsync(labelByUser));
 
 /**
  * @openapi
@@ -112,6 +139,13 @@ router.get('/:id/comparison', catchAsync(getDocumentComparison));
  *     tags: [Documents]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Document ID
  */
 router.delete('/:id', catchAsync(deleteDocument));
 
