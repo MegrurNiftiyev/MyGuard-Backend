@@ -432,4 +432,21 @@ export async function apiClient<T>(endpoint: string, options: RequestInit = {}):
 
   return response.json();
 }
-```
+---
+
+## 🤖 10. AI Chat System Prompt Mühəndisliyi Və Blok Qaydaları (`prompts.ts`)
+
+AI Asistent modelinin backend tərəfində JSON formalı cavablar verməsi və ekran kontekstinə uyğunlaşması üçün istifadə olunan Sistem Prompt qaydaları.
+
+- **İnteqrasiya Modulu:** [`src/modules/chat/prompts.ts`](file:///c:/Users/megru/Desktop/Programlar/Github/MyGurad-IDDA-Final_project/backend/src/modules/chat/prompts.ts)
+
+### 🔹 10.1 `chatMode` Qaydaları (Sistem Promptuna Məcburi Şərt)
+- **`SMALL_CHAT`**: Cavab YALNIZ 1-3 sadə `text` və ya `callout` bloku daxilində olmalıdır. Cədvəl, qrafik, kod blokları **istifadə edilmir**.
+- **`LARGE_CHAT`**: Bütün 11 blok növündən (charts, tables, code, lists, images) tam istifadə azaddır.
+
+### 🔹 10.2 `screenDestination` Əsaslı Kontekstlər
+- **`HOME_SCREEN`**: İcraçı xülasə və ümumi təhlükəsizlik statusuna fokuslanır.
+- **`DOCUMENTS_SCREEN`**: Sənəd analizi, OCR və PDF daxili mətn qatı fərqlərinə (`<ferqli>text</ferqli>`) fokuslanır.
+- **`SCAN_SCREEN`**: Canlı 7 mərhələli skan boru xəttinə və təhlükəsizlik addımlarına fokuslanır.
+- **`SETTINGS_SCREEN`**: Platform konfiqurasiyalarına və threshold tənzimləmələrinə fokuslanır.
+- **`AI_SCREEN`**: Master Security Operations Center rejimidir — tam analitik hesabatlar və qrafiklər generasiya edilir.
