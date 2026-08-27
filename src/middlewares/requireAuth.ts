@@ -15,13 +15,7 @@ export async function requireAuth(
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    // Müvəqqəti olaraq lokal testlər üçün token yoxlanışını keçirik (Mock user təyin olunur):
-    req.user = {
-      uid: 'dev-user-123',
-      email: 'e.mammadov@soc.gov.az',
-      role: 'admin',
-    };
-    return next();
+    throw new AppError('Avtorizasiya tokeni tələb olunur (Bearer Token Missing)', 401);
   }
 
   const token = authHeader.split('Bearer ')[1].trim();
