@@ -60,6 +60,8 @@ app.get('/api/health', (req, res) => {
 // Authentication Routes (Public & Protected routes handled internally)
 app.use('/api/auth', authRoutes);
 
+import settingsRoutes from './modules/settings/settings.routes.js';
+
 // Protected Core Application Routes (Auth disabled temporarily for testing)
 app.use('/api/users', /* requireAuth, */ usersRoutes);
 app.use('/api/documents', /* requireAuth, */ documentRoutes);
@@ -67,6 +69,7 @@ app.use('/api/reports', /* requireAuth, */ reportRoutes);
 app.use('/api/chat', /* requireAuth, */ chatRoutes);
 app.use('/api/admin', /* requireAuth, */ adminRoutes);
 app.use('/api/security', /* requireAuth, */ securityRoutes);
+app.use('/api/settings', /* requireAuth, */ settingsRoutes);
 
 
 // 404 Route Handler

@@ -71,9 +71,14 @@ export interface Document {
 
   layer3_llmReview: {
     used: boolean;
+    isMalicious: boolean;
+    confidence: number;
     explanation: string | null;
     message: string | null;
     recommendedAction: string | null;
+    attackVector?: string;
+    reasoning?: string;
+    mitigationSteps?: string[];
   } | null;
 
   finalRiskScore: number | null;
@@ -127,6 +132,30 @@ export interface StructuredAiAnalysis {
   recommendation: string;
 }
 
+export type AiMessageBlock =
+  | { type: 'header'; title: string; subtitle?: string }
+  | { type: 'text'; content: string }
+  | { type: 'callout'; title?: string; content: string; tone: 'danger' | 'warning' | 'info' | 'success' }
+  | { type: 'table'; title?: string; headers: string[]; rows: (string | number)[][] }
+  | {
+      type: 'chart';
+      title?: string;
+      subtitle?: string;
+      chartType: 'area' | 'bar' | 'line' | 'pie' | 'donut' | 'horizontal_bar';
+      chartKeys: {
+        nameKey: string;
+        valueKey?: string;
+        dataKeys?: { key: string; tone: string; label: string }[];
+      };
+      chartData: Record<string, string | number>[];
+    }
+  | { type: 'list'; title?: string; listType: 'numbered' | 'bulleted'; items: string[] }
+  | { type: 'image'; title: string; description: string; actionLabel?: string; actionUrl?: string }
+  | { type: 'code'; title?: string; language: string; code: string }
+  | { type: 'quote'; title?: string; content: string; author?: string; date?: string }
+  | { type: 'link'; label: string; url: string; content?: string }
+  | { type: 'file'; name: string; sizeLabel: string; url: string };
+
 export type MessageBlockType = 
   | 'header' 
   | 'text' 
@@ -146,7 +175,7 @@ export interface MessageBlock {
   title?: string;
   subtitle?: string;
   content?: string;
-  chartType?: 'area' | 'line' | 'bar' | 'horizontal_bar' | 'donut';
+  chartType?: 'area' | 'line' | 'bar' | 'pie' | 'horizontal_bar' | 'donut';
   chartData?: any[];
   chartKeys?: { 
     nameKey?: string; 
@@ -172,31 +201,34 @@ export interface MessageBlock {
   author?: string;
   date?: string;
   items?: string[];
-  listType?: 'numbered' | 'bullet';
+  listType?: 'numbered' | 'bulleted' | 'bullet';
 }
 
-export enum ChatMode {
-  SMALL_CHAT = 'SMALL_CHAT',
-  LARGE_CHAT = 'LARGE_CHAT',
-}
+export const ChatMode = {
+  SMALL_CHAT: 'SMALL_CHAT',
+  LARGE_CHAT: 'LARGE_CHAT',
+} as const;
+export type ChatMode = typeof ChatMode[keyof typeof ChatMode] | string;
 
-export enum ScreenDestination {
-  HOME_SCREEN = 'HOME_SCREEN',
-  DOCUMENTS_SCREEN = 'DOCUMENTS_SCREEN',
-  SCAN_SCREEN = 'SCAN_SCREEN',
-  SETTINGS_SCREEN = 'SETTINGS_SCREEN',
-  AI_SCREEN = 'AI_SCREEN',
-}
+export const ScreenDestination = {
+  HOME_SCREEN: 'HOME_SCREEN',
+  DOCUMENTS_SCREEN: 'DOCUMENTS_SCREEN',
+  SCAN_SCREEN: 'SCAN_SCREEN',
+  SETTINGS_SCREEN: 'SETTINGS_SCREEN',
+  AI_SCREEN: 'AI_SCREEN',
+} as const;
+export type ScreenDestination = typeof ScreenDestination[keyof typeof ScreenDestination] | string;
 
 export interface SendChatMessageRequest {
-  chatMode: ChatMode;
-  screenDestination: ScreenDestination;
+  chatMode?: ChatMode;
+  screenDestination?: ScreenDestination;
   message: string;
   sessionId?: string;
+  contextDocumentId?: string;
 }
 
 export interface SmallChatMessage {
-  chatMode: ChatMode.SMALL_CHAT;
+  chatMode: typeof ChatMode.SMALL_CHAT | string;
   text: string;
 }
 

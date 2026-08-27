@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { catchAsync } from '../../utils/catchAsync.js';
-import { listModels } from './admin.controller.js';
+import { listModels, registerModel } from './admin.controller.js';
 
 const router = Router();
 
@@ -12,9 +12,13 @@ const router = Router();
  *     tags: [Admin & Registry]
  *     security:
  *       - BearerAuth: []
+ *   post:
+ *     summary: Register or promote new ML model version
+ *     tags: [Admin & Registry]
+ *     security:
+ *       - BearerAuth: []
  */
 router.get('/models', catchAsync(listModels));
-
-
+router.post('/models', catchAsync(registerModel));
 
 export default router;

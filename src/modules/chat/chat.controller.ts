@@ -28,9 +28,12 @@ export async function getHistory(req: AuthenticatedRequest, res: Response) {
 export async function sendMessage(req: AuthenticatedRequest, res: Response) {
   const { chatMode, screenDestination, message, sessionId } = req.body as SendChatMessageRequest;
 
-  if (!chatMode || !screenDestination || !message) {
-    throw new AppError('chatMode, screenDestination və message məcburidir', 400);
+  if (!message) {
+    throw new AppError('message parametri məcburidir', 400);
   }
+
+  const mode = chatMode || 'LARGE_CHAT';
+  const dest = screenDestination || 'AI_SCREEN';
 
   const systemPrompt = getSystemPromptFor(screenDestination);
 

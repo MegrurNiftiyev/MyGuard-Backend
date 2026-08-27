@@ -154,13 +154,28 @@ export async function appendToHistory(sessionId: string, userMessageText: string
 
 /**
  * Intelligent Dynamic AI Block Constructor
- * Synthesizes multi-block responses matching any query intent (charts, metrics, code, threats, lists)
+ * Synthesizes multi-block responses matching any query intent, respecting chatMode & screenDestination
  */
 export function constructDynamicAiResponse(
   userQuery: string,
-  attachmentDocId?: string
+  attachmentDocId?: string,
+  chatMode?: string,
+  screenDestination?: string
 ): { text: string; structuredAnalysis?: StructuredAiAnalysis; blocks: MessageBlock[] } {
   const query = (userQuery || '').toLowerCase();
+  const isSmallChat = chatMode === 'SMALL_CHAT';
+
+  if (isSmallChat) {
+    return {
+      text: `Sistem hazırda ${screenDestination || 'CURRENT'} ekranındadır. Sorğunuz üzrə təhlükəsizlik analizi tamamlandı.`,
+      blocks: [
+        {
+          type: 'text',
+          content: `Sorğunuz analiz edildi (${screenDestination || 'Ümumi rejim'}). Sənəd və ya risk faktorları haqqında ətraflı hesabat üçün Böyük Söhbət rejimini istifadə edin.`
+        }
+      ]
+    };
+  }
 
   // 1. If asking about a specific document or threat breakdown
   if (attachmentDocId || query.includes('sənəd') || query.includes('fayl') || query.includes('cv') || query.includes('hr_muraciet') || query.includes('risk')) {

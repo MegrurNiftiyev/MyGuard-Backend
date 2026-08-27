@@ -269,14 +269,21 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
   
   const overallRiskScore = layer1Result.hiddenTextDetected ? 92 : isInjection ? 85 : 12;
   const status: RiskStatus = overallRiskScore > 80 ? 'high_risk' : overallRiskScore > 30 ? 'suspicious' : 'safe';
+  const isContainInjection = Boolean(status === 'high_risk' || isInjection || layer3Result.isMalicious);
 
   await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { 
     stepStatus: 'completed',
+    isContainInjection,
     layer3_llmReview: {
       used: overallRiskScore > 60 || layer3Result.isMalicious,
+      isMalicious: layer3Result.isMalicious,
+      confidence: layer3Result.confidence || 0.97,
       explanation: layer3Result.explanation,
       message: layer3Result.explanation,
       recommendedAction: layer3Result.recommendedAction,
+      attackVector: layer3Result.attackVector,
+      reasoning: layer3Result.reasoning,
+      mitigationSteps: layer3Result.mitigationSteps,
     },
     finalRiskScore: overallRiskScore,
     finalStatus: status
