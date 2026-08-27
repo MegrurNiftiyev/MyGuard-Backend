@@ -6,10 +6,10 @@ export interface AuthenticatedUser {
   role?: string;
 }
 
-export interface AuthenticatedRequest extends Request<any, any, any, any> {
+export type AuthenticatedRequest = Request & {
   user?: AuthenticatedUser;
   file?: any;
-}
+};
 
 export type RiskStatus = 'safe' | 'suspicious' | 'high_risk' | 'blocked';
 export type ActionDecision = 'ALLOWED' | 'BLOCKED' | 'REQUIRES_CONFIRMATION';
