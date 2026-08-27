@@ -54,6 +54,8 @@ export interface Document {
     extraTextSegments: string[];
     textDifferenceFound: boolean;
     differenceSnippet: string;
+    ocrText: string;
+    pdfTextLayer: string;
     status: 'clean' | 'suspicious';
   } | null;
 

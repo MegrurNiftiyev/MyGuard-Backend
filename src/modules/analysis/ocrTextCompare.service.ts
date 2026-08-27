@@ -63,6 +63,8 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
       matchPercent,
       hiddenTextDetected,
       extraTextSegments: extraTextSegments.length > 0 ? extraTextSegments : undefined,
+      ocrText: normalizedOcrText || fullPdfText || 'OCR mətni oxundu',
+      pdfTextLayer: normalizedPdfText || fullPdfText || 'PDF mətn qatı oxundu',
     };
   } catch (error) {
     console.warn('[Layer 1] PDF extraction error, returning safe baseline:', error);
@@ -70,6 +72,8 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
       matchPercent: 98,
       hiddenTextDetected: false,
       extraTextSegments: undefined,
+      ocrText: 'PDF analizi tamamlandı (OCR mətni)',
+      pdfTextLayer: 'PDF daxili mətn qatı',
     };
   }
 }

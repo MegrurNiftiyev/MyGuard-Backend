@@ -57,20 +57,19 @@ export async function getDocumentComparison(req: AuthenticatedRequest, res: Resp
     throw new AppError('Sənəd tapılmadı', 404);
   }
 
-  // Fallback / mock content for text layers, since we don't save raw text in the new Document model
-  // but the frontend might still expect it.
   res.json({
     documentId: docId,
     documentName: document.fileName,
-    ocrText: `Mock OCR Text for ${document.fileName}`,
-    pdfTextLayer: `Mock PDF Layer for ${document.fileName}`,
+    ocrText: document.layer1_ocrTextMatch?.ocrText || `Mock OCR Text for ${document.fileName}`,
+    pdfTextLayer: document.layer1_ocrTextMatch?.pdfTextLayer || `Mock PDF Layer for ${document.fileName}`,
     ocrPdfMatch: document.layer1_ocrTextMatch?.matchPercent || 100,
     hiddenTextDetected: document.layer1_ocrTextMatch?.hiddenTextDetected || false,
-    flaggedSnippet: document.layer1_ocrTextMatch?.extraTextSegments?.[0] || '',
+    textDifferenceFound: document.layer1_ocrTextMatch?.textDifferenceFound || false,
+    flaggedSnippet: document.layer1_ocrTextMatch?.differenceSnippet || document.layer1_ocrTextMatch?.extraTextSegments?.[0] || '',
     flaggedMetadata: {
       pageNumber: 1,
       visibilityType: 'PDF Layer Only',
-      location: 'Mock Location'
+      location: 'Text Layer Comparison'
     },
   });
 }

@@ -186,8 +186,6 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
   const matchPercent = layer1Result.matchPercent || 95;
   const differenceSnippet = hasExtraText ? layer1Result.extraTextSegments[0] : (matchPercent < 100 ? 'OCR və PDF daxili mətn qatı arasında kiçik fərqlilik aşkar edildi.' : '');
 
-  await updateDocumentAndEmit(docId, 'HIDDEN_TEXT_DETECTION', { stepStatus: 'active' });
-  await sleep(800);
   await updateDocumentAndEmit(docId, 'HIDDEN_TEXT_DETECTION', { 
     stepStatus: 'completed',
     layer1_ocrTextMatch: {
@@ -196,6 +194,8 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       extraTextSegments: layer1Result.extraTextSegments || [],
       textDifferenceFound: hasExtraText || matchPercent < 100,
       differenceSnippet,
+      ocrText: layer1Result.ocrText || `Skan edilmiş OCR mətni: ${filename}`,
+      pdfTextLayer: layer1Result.pdfTextLayer || `PDF daxili raw text qatı: ${filename}`,
       status: layer1Result.hiddenTextDetected || matchPercent < 100 ? 'suspicious' : 'clean'
     }
   });

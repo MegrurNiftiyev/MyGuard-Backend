@@ -66,6 +66,8 @@ const options: swaggerJSDoc.Options = {
                 extraTextSegments: { type: 'array', items: { type: 'string' } },
                 textDifferenceFound: { type: 'boolean', example: false },
                 differenceSnippet: { type: 'string', example: '' },
+                ocrText: { type: 'string', example: 'Skan edilmiş OCR mətni...' },
+                pdfTextLayer: { type: 'string', example: 'PDF daxili raw text qatı...' },
                 status: { type: 'string', example: 'clean' },
               },
             },
