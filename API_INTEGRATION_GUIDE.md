@@ -218,11 +218,16 @@ FİN Kod (əsas) və ya Email ilə daxil olmaq.
   "layer2_classification": {
     "label": "injection",
     "confidence": 0.96,
-    "categories": ["Instruction Override"]
+    "accuracy": 0.98,
+    "message": "ML classifier tərəfindən mətn daxilində instruction override cəhdi aşkar edildi.",
+    "categories": ["Instruction Override"],
+    "requiresUserConfirmation": true
   },
   "layer3_llmReview": {
     "used": true,
-    "explanation": "Sənədin PDF mətn qatında gizlədilmiş direktiv aşkar edildi."
+    "explanation": "Sənədin PDF mətn qatında gizlədilmiş direktiv aşkar edildi.",
+    "message": "Sənədin PDF mətn qatında gizlədilmiş direktiv aşkar edildi.",
+    "recommendedAction": "Sənədin daxili AI modellərinə ötürülməsi BLOKLANMALIDIR. Təmizlənmiş versiyanı istifadə edin."
   },
   "finalRiskScore": 92,
   "finalStatus": "high_risk",
