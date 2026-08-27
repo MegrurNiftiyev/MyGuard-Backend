@@ -3,6 +3,7 @@ import { COLLECTIONS } from '../../config/collections.js';
 import { analyzeDocumentLayer1 } from '../analysis/ocrTextCompare.service.js';
 import { Layer2ClassifierResult, runMockLayer2Classifier, runMockLayer3SecurityLLM } from '../analysis/mockAnalysis.service.js';
 import { classifyDocumentText } from '../analysis/fastapi.service.js';
+import { evaluateLayer3SecurityLLM } from '../analysis/llmSecurityReview.service.js';
 import { Document, DocumentListItem, RiskStatus, ThreatItem, ScanStep, ScanSocketEvent } from './documents.schema.js';
 import { io } from '../../server.js';
 import { AppError } from '../../errors/AppError.js';
@@ -240,9 +241,19 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
     }
   });
 
-  // Risk Assessment (Layer 3 included here in mock)
+  // Layer 3: Risk Assessment & LLM Security Evaluation
   await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { stepStatus: 'active' });
-  const layer3Result = await runMockLayer3SecurityLLM(filename, layer1Result, layer2Result);
+
+  const layer3Result = await evaluateLayer3SecurityLLM({
+    filename,
+    ocrText: layer1Result.ocrText,
+    pdfTextLayer: layer1Result.pdfTextLayer,
+    extraTextSegments: layer1Result.extraTextSegments,
+    matchPercent: layer1Result.matchPercent || 95,
+    hiddenTextDetected: layer1Result.hiddenTextDetected || false,
+    layer2Result,
+  });
+
   await sleep(1000);
   
   const overallRiskScore = layer1Result.hiddenTextDetected ? 92 : isInjection ? 85 : 12;
@@ -251,14 +262,10 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
   await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { 
     stepStatus: 'completed',
     layer3_llmReview: {
-      used: overallRiskScore > 60,
+      used: overallRiskScore > 60 || layer3Result.isMalicious,
       explanation: layer3Result.explanation,
       message: layer3Result.explanation,
-      recommendedAction: overallRiskScore > 80 
-        ? 'Sənədin daxili AI modellərinə ötürülməsi BLOKLANMALIDIR. Təmizlənmiş versiyanı istifadə edin.' 
-        : overallRiskScore > 30 
-        ? 'Sənəd şübhəlidir. İstifadəçi tərəfindən manual təsdiqlənməyə ehtiyac var.' 
-        : 'Sənəd təhlükəsizdir. İcra oluna bilər.',
+      recommendedAction: layer3Result.recommendedAction,
     },
     finalRiskScore: overallRiskScore,
     finalStatus: status
