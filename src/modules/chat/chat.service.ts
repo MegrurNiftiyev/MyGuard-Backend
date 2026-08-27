@@ -61,6 +61,29 @@ export async function getChatHistory(sessionId: string, limitCount: number = 10)
   }
 
   const msgs = memoryMessages.get(sessionId) || [];
+  if (msgs.length === 0) {
+    // Yeni və ya boş sessiyalar üçün ilkin xoş gəlmisiniz mesajı (Demo / Initial Welcome Message)
+    const welcomeMsg: LargeChatMessage = {
+      id: 'msg-welcome-' + sessionId,
+      sender: 'assistant',
+      timestamp: new Date().toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' }),
+      blocks: [
+        {
+          type: 'header',
+          title: 'MyGuard AI Təhlükəsizlik Asistenti',
+          subtitle: 'Sənədlərin təhlükəsizliyi, prompt injection analizi və risk hesabatları üzrə köməkçiniz.'
+        },
+        {
+          type: 'callout',
+          title: 'Sessiya Başladıldı',
+          content: 'Sualınızı yazın və ya analiz etmək istədiyiniz sənəd haqqında məlumat tələb edin.',
+          tone: 'info'
+        }
+      ]
+    };
+    return [welcomeMsg];
+  }
+
   return msgs.slice(-limitCount);
 }
 

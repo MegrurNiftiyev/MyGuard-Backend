@@ -41,7 +41,9 @@ try {
   if (isFirebaseInitialized && app) {
     db = getFirestore(app);
     auth = getAuth(app);
-    storageBucket = getStorage(app).bucket();
+    const bucketName = env.FIREBASE_STORAGE_BUCKET || 'mygurad.firebasestorage.app';
+    storageBucket = getStorage(app).bucket(bucketName);
+    console.log(`[Firebase Storage] Connected to bucket: ${bucketName}`);
   }
 } catch (error) {
   console.error('[Firebase Admin] Initialization error:', error);

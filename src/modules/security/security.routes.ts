@@ -31,6 +31,21 @@ router.get('/actions', catchAsync(listAgentActions));
  *         schema:
  *           type: string
  *         description: Action ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [decision]
+ *             properties:
+ *               decision:
+ *                 type: string
+ *                 enum: [ALLOWED, BLOCKED]
+ *                 example: "BLOCKED"
+ *     responses:
+ *       200:
+ *         description: Decision updated successfully
  */
 router.patch('/actions/:id/decision', catchAsync(updateDecision));
 

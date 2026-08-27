@@ -101,6 +101,28 @@ router.post('/refresh', catchAsync(refresh));
  *   post:
  *     summary: myGov QR / SSO Login
  *     tags: [Authentication]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               finCode:
+ *                 type: string
+ *                 example: "7MYG001"
+ *               qrSessionId:
+ *                 type: string
+ *                 example: "mygov-qr-session-987"
+ *               fullName:
+ *                 type: string
+ *                 example: "myGov Doğrulanmış İstifadəçi"
+ *               email:
+ *                 type: string
+ *                 example: "user@mygov.az"
+ *               phone:
+ *                 type: string
+ *                 example: "+994 50 111 22 33"
  */
 router.post('/mygov', catchAsync(loginMyGov));
 
@@ -110,6 +132,28 @@ router.post('/mygov', catchAsync(loginMyGov));
  *   post:
  *     summary: SİMA QR / SSO Login
  *     tags: [Authentication]
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               finCode:
+ *                 type: string
+ *                 example: "7SIM001"
+ *               qrSessionId:
+ *                 type: string
+ *                 example: "sima-qr-session-456"
+ *               fullName:
+ *                 type: string
+ *                 example: "SİMA Doğrulanmış İstifadəçi"
+ *               email:
+ *                 type: string
+ *                 example: "user@sima.az"
+ *               phone:
+ *                 type: string
+ *                 example: "+994 55 222 33 44"
  */
 router.post('/sima', catchAsync(loginSima));
 
@@ -123,7 +167,10 @@ router.post('/sima', catchAsync(loginSima));
  *     tags: [Authentication]
  *     security:
  *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logout successful
  */
-router.post('/logout', requireAuth, catchAsync(logout));
+router.post('/logout', /* requireAuth, */ catchAsync(logout));
 
 export default router;

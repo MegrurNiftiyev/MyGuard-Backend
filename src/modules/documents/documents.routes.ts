@@ -100,6 +100,19 @@ router.post('/upload', upload.single('document'), catchAsync(uploadDocument));
  *         schema:
  *           type: string
  *         description: Document ID
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               preserveFormatting:
+ *                 type: boolean
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: Cleaned document ready for download
  */
 router.post('/:id/clean-injection', catchAsync(cleanInjection));
 

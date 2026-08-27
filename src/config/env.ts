@@ -9,4 +9,5 @@ export const env = {
   FIREBASE_SERVICE_ACCOUNT_JSON: process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
   FIREBASE_STORAGE_BUCKET: process.env.FIREBASE_STORAGE_BUCKET,
   FASTAPI_ANALYSIS_URL: process.env.FASTAPI_ANALYSIS_URL || 'http://localhost:8000',
+  JWT_SECRET: process.env.JWT_SECRET || 'myguard-super-secret-jwt-key-2026',
 };

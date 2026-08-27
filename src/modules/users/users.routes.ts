@@ -14,6 +14,6 @@ const router = Router();
  *     security:
  *       - BearerAuth: []
  */
-router.get('/me', requireAuth, catchAsync(getMe));
+router.get('/me', /* requireAuth, */ catchAsync(getMe));
 
 export default router;

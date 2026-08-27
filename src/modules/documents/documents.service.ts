@@ -102,16 +102,13 @@ export async function processAndSaveDocument(
 
   if (isFirebaseInitialized && storageBucket) {
     try {
-      const fileRef = storageBucket.file(`documents/${userId}/${docId}_${filename}`);
+      const storagePath = `documents/${userId}/${docId}_${filename}`;
+      const fileRef = storageBucket.file(storagePath);
       await fileRef.save(fileBuffer, { metadata: { contentType: mimeType } });
-      const [signedUrl] = await fileRef.getSignedUrl({
-        action: 'read',
-        expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
-      });
-      // Always store gs:// URL as requested
-      fileUrl = `gs://mygurad.firebasestorage.app/documents/${userId}/${docId}_${filename}`;
+      fileUrl = `gs://mygurad.firebasestorage.app/${storagePath}`;
+      console.log(`[Document Service] Successfully uploaded file to Firebase Storage: ${fileUrl}`);
     } catch (err) {
-      console.warn('[Document Service] Storage upload skipped:', err);
+      console.error('[Document Service] Firebase Storage upload error:', err);
     }
   }
 

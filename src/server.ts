@@ -27,10 +27,12 @@ io.on('connection', (socket) => {
   });
 });
 
-httpServer.listen(env.PORT, async () => {
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : env.PORT;
+
+httpServer.listen(PORT, async () => {
   console.log(`===================================================`);
-  console.log(`[MyGuard Backend] Server running on port ${env.PORT}`);
-  console.log(`[MyGuard Backend] Swagger Docs: http://localhost:${env.PORT}/api-docs`);
+  console.log(`[MyGuard Backend] Server running on port ${PORT}`);
+  console.log(`[MyGuard Backend] Swagger Docs: http://localhost:${PORT}/api-docs`);
   console.log(`[MyGuard Backend] Firebase Admin: ${isFirebaseInitialized ? 'CONNECTED' : 'MOCK/DEV MODE'}`);
   console.log(`[MyGuard Backend] FastAPI Service: MOCKED (Will be provided externally)`);
   console.log(`===================================================`);

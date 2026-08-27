@@ -34,6 +34,19 @@ router.get('/history/:sessionId', catchAsync(getHistory));
  *     tags: [AI Assistant]
  *     security:
  *       - BearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: "Yeni Təhlükəsizlik Sessiyası"
+ *     responses:
+ *       200:
+ *         description: Chat session created successfully
  */
 router.post('/session', catchAsync(createSession));
 
@@ -45,6 +58,30 @@ router.post('/session', catchAsync(createSession));
  *     tags: [AI Assistant]
  *     security:
  *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [chatMode, screenDestination, message]
+ *             properties:
+ *               chatMode:
+ *                 type: string
+ *                 enum: [SMALL_CHAT, LARGE_CHAT]
+ *                 example: "SMALL_CHAT"
+ *               screenDestination:
+ *                 type: string
+ *                 example: "Dashboard"
+ *               message:
+ *                 type: string
+ *                 example: "Salam, sənədlərdə olan prompt injection təhdidləri haqqında məlumat ver."
+ *               sessionId:
+ *                 type: string
+ *                 example: "session-1724500000"
+ *     responses:
+ *       200:
+ *         description: AI response returned successfully
  */
 router.post('/message', catchAsync(sendMessage));
 
