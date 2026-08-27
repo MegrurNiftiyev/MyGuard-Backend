@@ -11,4 +11,6 @@ export const env = {
   FASTAPI_ANALYSIS_URL: process.env.FASTAPI_ANALYSIS_URL || 'http://localhost:8000',
   INTERNAL_SERVICE_TOKEN: process.env.INTERNAL_SERVICE_TOKEN || 'myguard-internal-secret-token-2026',
   JWT_SECRET: process.env.JWT_SECRET || 'myguard-super-secret-jwt-key-2026',
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+  OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4o-mini',
 };

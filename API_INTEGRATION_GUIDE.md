@@ -930,3 +930,19 @@ const response = await fetch('https://myguard-backend-i4ll.onrender.com/api/docu
   body: formData
 });
 ```
+
+---
+
+## 🤖 14. OpenAI API İnteqrasiyası Və JSON Cavab Rejimi (`OPENAI_API_KEY`)
+
+Layer 3 skan mərhələsi canlı OpenAI API (`gpt-4o-mini` / `gpt-4o`) modelləri ilə tam inteqrasiya edilmişdir.
+
+- **Ətraf Mühit Dəyişənləri (`.env` / Render Env):**
+  ```env
+  OPENAI_API_KEY=sk-proj-your-actual-key-here
+  OPENAI_MODEL=gpt-4o-mini
+  ```
+- **Xüsusi JSON Cavab Rejimi (`response_format: { type: "json_object" }`):**
+  OpenAI API-dən birbaşa təmiz JSON obyekti tələb olunur, beləliklə markdown blokları olmadan sıfır xəta ilə işləyir.
+- **Davamlı Təhlükəsizlik Rejimi (Fallback):**
+  `OPENAI_API_KEY` daxil edilmədikdə və ya OpenAI API-da problem yarandıqda backend avtomatik olaraq daxili heuristik auditora keçir və server heç vaxt çökmür!

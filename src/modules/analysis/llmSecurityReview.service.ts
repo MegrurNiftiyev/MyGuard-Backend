@@ -1,5 +1,6 @@
 import { Layer2ClassifierResult, Layer3LLMAnalysisResult } from './mockAnalysis.service.js';
 import { SupportedLanguage, translate } from '../../utils/i18n.js';
+import { env } from '../../config/env.js';
 
 export interface LlmPromptParams {
   filename: string;
@@ -75,7 +76,7 @@ Return a valid JSON object matching the following structure:
 }
 
 /**
- * Executes Layer 3 Security Evaluation with full reasoning, anti-injection isolation, and localization support
+ * Executes Layer 3 Security Evaluation with OpenAI GPT models or internal security evaluator fallback
  */
 export async function evaluateLayer3SecurityLLM(
   params: LlmPromptParams
@@ -83,7 +84,66 @@ export async function evaluateLayer3SecurityLLM(
   const lang = params.lang || 'az';
   const formattedPrompt = buildInjectionProofLlmPrompt(params);
 
-  // Simulate LLM processing time
+  // If OPENAI_API_KEY is configured, call OpenAI API in JSON mode
+  if (env.OPENAI_API_KEY && env.OPENAI_API_KEY.startsWith('sk-') && !env.OPENAI_API_KEY.includes('paste-your')) {
+    try {
+      console.log(`[LLM Security] Calling OpenAI (${env.OPENAI_MODEL}) for doc: ${params.filename}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: env.OPENAI_MODEL || 'gpt-4o-mini',
+          response_format: { type: 'json_object' },
+          temperature: 0.1,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are MyGuard Layer 3 AI Security Auditor. Output MUST be valid JSON strictly adhering to requested schema.',
+            },
+            {
+              role: 'user',
+              content: formattedPrompt,
+            },
+          ],
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const json = await response.json();
+        const contentStr = json.choices?.[0]?.message?.content;
+        if (contentStr) {
+          const parsed = JSON.parse(contentStr);
+          console.log(`[LLM Security] OpenAI review completed successfully for ${params.filename}`);
+          return {
+            isMalicious: Boolean(parsed.isMalicious),
+            confidence: Number(parsed.confidence) || 0.95,
+            explanation: String(parsed.explanation || 'Sənəd OpenAI tərəfindən təhlil edildi.'),
+            recommendedAction: String(parsed.recommendedAction || translate(parsed.isMalicious ? 'rec_block' : 'rec_allow', lang)),
+            attackVector: String(parsed.attackVector || 'Indirect Prompt Injection'),
+            reasoning: String(parsed.reasoning || parsed.explanation || ''),
+            mitigationSteps: Array.isArray(parsed.mitigationSteps) ? parsed.mitigationSteps : [],
+            promptUsed: formattedPrompt,
+          };
+        }
+      } else {
+        const errText = await response.text().catch(() => '');
+        console.warn(`[LLM Security] OpenAI API returned error ${response.status}: ${errText}`);
+      }
+    } catch (err: any) {
+      console.warn(`[LLM Security] OpenAI API call failed (${err?.message || err}). Falling back to heuristic evaluator.`);
+    }
+  }
+
+  // Fallback heuristic evaluator if OpenAI key is empty or API call fails
   await new Promise((resolve) => setTimeout(resolve, 400));
 
   const isMalicious = params.layer2Result.isInjection || params.hiddenTextDetected || params.matchPercent < 90;
