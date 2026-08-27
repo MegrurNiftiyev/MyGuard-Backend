@@ -220,6 +220,7 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
     text: layer1Result.pdfTextLayer || filename,
     ocrText: layer1Result.ocrText || null,
     hiddenText: layer1Result.extraTextSegments?.[0] || null,
+    language: lang,
   });
 
   const layer2Result: Layer2ClassifierResult = fastApiResult

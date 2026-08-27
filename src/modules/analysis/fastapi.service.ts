@@ -47,6 +47,7 @@ export async function classifyDocumentText(
       headers: {
         'Content-Type': 'application/json',
         'X-Internal-Token': env.INTERNAL_SERVICE_TOKEN,
+        'Accept-Language': payload.language || 'az',
       },
       body: JSON.stringify({
         documentId: payload.documentId,
