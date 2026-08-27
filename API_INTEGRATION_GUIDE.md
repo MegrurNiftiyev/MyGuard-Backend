@@ -353,60 +353,7 @@ socket.on('scan_event', (data) => {
 
 ---
 
-## 🛡️ 7. Təhlükəsizlik Fəaliyyətləri (`/api/security/actions`)
-
-### 🔹 7.1 `GET /api/security/actions`
-- **Response (200 OK):**
-```json
-{
-  "actions": [
-    {
-      "id": "act-101",
-      "agent": "Mail Gateway Agent",
-      "action": "Send document by email",
-      "file": "internal_salary_report.pdf",
-      "destination": "external@gmail.com",
-      "sensitivity": "Critical",
-      "decision": "BLOCKED",
-      "timestamp": "14:28:10",
-      "reason": "Kritik daxili əməkhaqqı hesabatının xarici ünvanına göndərilməsi avtomatik bloka alındı."
-    }
-  ]
-}
-```
-
----
-
-## ⚙️ 8. Platform Tənzimləmələri (`/api/settings`)
-
-### 🔹 8.1 `GET /api/settings`
-- **Response (200 OK):**
-```json
-{
-  "settings": {
-    "confidenceThreshold": 0.85,
-    "enableOcrComparison": true,
-    "enableLlmReview": true,
-    "autoBlockHighRisk": true,
-    "notificationEmail": "security@myguard.az",
-    "language": "az",
-    "maxUploadSizeBytes": 10485760
-  }
-}
-```
-
-### 🔹 8.2 `PUT /api/settings`
-- **Request Body (JSON):**
-```json
-{
-  "confidenceThreshold": 0.90,
-  "autoBlockHighRisk": true
-}
-```
-
----
-
-## 💻 9. Standard Frontend API Service (`apiClient.ts`)
+## 💻 7. Standard Frontend API Service (`apiClient.ts`)
 
 ```typescript
 const BASE_URL = 'https://myguard-backend-i4ll.onrender.com/api';
