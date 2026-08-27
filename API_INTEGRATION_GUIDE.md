@@ -821,3 +821,34 @@ export async function apiClient<T>(endpoint: string, options: RequestInit = {}):
   return response.json();
 }
 ```
+
+---
+
+## 🐍 11. Python FastAPI ML Mikroxidmət İnteqrasiyası (`Ai-Models`)
+
+Node.js Backend Layer 2 skan mərhələsində `FASTAPI_ANALYSIS_URL` vasitəsilə Python FastAPI ML mikroxidməti (`Ai-Models`) ilə birbaşa əlaqə qurur.
+
+- **FastAPI Server URL:** `http://localhost:8000` (Canlıda: `https://myguard-ai-backend.onrender.com`)
+- **Daxili Təhlükəsizlik Tokeni Header-i:** `X-Internal-Token: <INTERNAL_SERVICE_TOKEN>`
+- **İnteqrasiya Modulu:** [`src/modules/analysis/fastapi.service.ts`](file:///c:/Users/megru/Desktop/Programlar/Github/MyGurad-IDDA-Final_project/backend/src/modules/analysis/fastapi.service.ts)
+
+### 🔹 11.1 POST `/classify` (RETVec + CNN Mətn Təsnifatı)
+Node.js sənəddən çıxarılan mətni, OCR mətni və gizli mətni FastAPI mikroxidmətinə göndərir:
+```json
+{
+  "documentId": "doc-1787753837283-457",
+  "text": "Sənədin daxili raw text qatı...",
+  "ocrText": "Görünən OCR mətni...",
+  "hiddenText": "Gizli 0pt mətn...",
+  "language": "en"
+}
+```
+
+**FastAPI Cavabı:**
+```json
+{
+  "label": "injection",
+  "confidence": 0.9854,
+  "categories": ["Instruction Override", "Data Exfiltration"]
+}
+```

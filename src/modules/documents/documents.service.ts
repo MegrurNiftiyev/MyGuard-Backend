@@ -1,7 +1,8 @@
 import { db, storageBucket, isFirebaseInitialized } from '../../config/firebase.js';
 import { COLLECTIONS } from '../../config/collections.js';
 import { analyzeDocumentLayer1 } from '../analysis/ocrTextCompare.service.js';
-import { runMockLayer2Classifier, runMockLayer3SecurityLLM } from '../analysis/mockAnalysis.service.js';
+import { Layer2ClassifierResult, runMockLayer2Classifier, runMockLayer3SecurityLLM } from '../analysis/mockAnalysis.service.js';
+import { classifyDocumentText } from '../analysis/fastapi.service.js';
 import { Document, DocumentListItem, RiskStatus, ThreatItem, ScanStep, ScanSocketEvent } from './documents.schema.js';
 import { io } from '../../server.js';
 import { AppError } from '../../errors/AppError.js';
@@ -200,10 +201,27 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
     }
   });
 
-  // Layer 2
+  // Layer 2: RETVec + CNN ML Microservice Classification
   await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { stepStatus: 'active' });
-  const layer2Result = await runMockLayer2Classifier(filename, layer1Result.hiddenTextDetected);
-  await sleep(1500);
+
+  const fastApiResult = await classifyDocumentText({
+    documentId: docId,
+    text: layer1Result.pdfTextLayer || filename,
+    ocrText: layer1Result.ocrText || null,
+    hiddenText: layer1Result.extraTextSegments?.[0] || null,
+  });
+
+  const layer2Result: Layer2ClassifierResult = fastApiResult
+    ? {
+        classification: fastApiResult.label === 'injection' ? 'High Risk' : fastApiResult.label === 'suspicious' ? 'Suspicious' : 'Safe',
+        confidence: fastApiResult.confidence,
+        isInjection: fastApiResult.label === 'injection',
+        riskCategory: fastApiResult.label === 'injection' ? 'Prompt Injection' : 'None',
+        matchedSignatures: fastApiResult.categories || [],
+      }
+    : await runMockLayer2Classifier(filename, layer1Result.hiddenTextDetected);
+
+  await sleep(1000);
   const isInjection = layer2Result.isInjection || false;
   const confidence = layer2Result.confidence || 0.95;
 
@@ -217,7 +235,7 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       message: isInjection 
         ? 'ML classifier tərəfindən mətn daxilində instruction override cəhdi aşkar edildi.'
         : 'ML classifier tərəfindən sənəd hərtərəfli təhlil edildi, hər hansı prompt injection aşkar edilmədi.',
-      categories: isInjection ? ['Instruction Override'] : [],
+      categories: layer2Result.matchedSignatures || [],
       requiresUserConfirmation: isInjection || layer1Result.hiddenTextDetected,
     }
   });
