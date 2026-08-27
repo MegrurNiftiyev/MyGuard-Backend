@@ -36,18 +36,27 @@ function pickSocketFields(doc: Document): ScanSocketEvent['fileData'] {
   };
 }
 
-async function updateDocumentAndEmit(docId: string, step: ScanStep, patch: Partial<Document>, isFinal = false) {
+import { SupportedLanguage, translate } from '../../utils/i18n.js';
+
+async function updateDocumentAndEmit(
+  docId: string, 
+  step: ScanStep, 
+  patch: Partial<Document>, 
+  isFinal = false, 
+  lang: SupportedLanguage = 'az'
+) {
   let doc = memoryDocuments.get(docId);
   if (!doc) return;
 
   const now = new Date().toISOString();
+  const stepMsg = translate(step, lang);
   
   if (patch.stepStatus === 'completed' || patch.stepStatus === 'error') {
     const lastStep = doc.stepHistory.find(s => s.step === step);
     if (lastStep && !lastStep.finishedAt) {
       lastStep.finishedAt = now;
       lastStep.status = patch.stepStatus;
-      lastStep.message = stepMessages[step] || 'Mərhələ tamamlandı';
+      lastStep.message = stepMsg;
     }
   } else if (patch.stepStatus === 'active') {
     doc.stepHistory.push({
@@ -55,7 +64,7 @@ async function updateDocumentAndEmit(docId: string, step: ScanStep, patch: Parti
       startedAt: now,
       finishedAt: null,
       status: 'completed', // Will be updated when finished
-      message: stepMessages[step] || 'Mərhələ icra olunur',
+      message: stepMsg,
     });
   }
 
@@ -96,7 +105,8 @@ export async function processAndSaveDocument(
   fileBuffer: Buffer,
   filename: string,
   mimeType: string,
-  userId: string
+  userId: string,
+  lang: SupportedLanguage = 'az'
 ): Promise<{ document: Document }> {
   const docId = 'doc-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
   const nowISO = new Date().toISOString();
@@ -150,43 +160,43 @@ export async function processAndSaveDocument(
   }
 
   // Start background pipeline
-  runPipeline(docId, fileBuffer, filename, mimeType).catch(console.error);
+  runPipeline(docId, fileBuffer, filename, mimeType, lang).catch(console.error);
 
   return { document: initialDoc };
 }
 
-async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, mimeType: string) {
+async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, mimeType: string, lang: SupportedLanguage = 'az') {
   // Wait a bit to ensure UI can connect to socket
   await sleep(1000); 
 
   await updateDocumentAndEmit(docId, 'DOCUMENT_UPLOADED', { 
     scanStartedAt: new Date().toISOString(), 
     stepStatus: 'active' 
-  });
+  }, false, lang);
   await sleep(800);
-  await updateDocumentAndEmit(docId, 'DOCUMENT_UPLOADED', { stepStatus: 'completed' });
+  await updateDocumentAndEmit(docId, 'DOCUMENT_UPLOADED', { stepStatus: 'completed' }, false, lang);
 
   // Layer 1
-  await updateDocumentAndEmit(docId, 'PDF_TEXT_EXTRACTION', { stepStatus: 'active' });
+  await updateDocumentAndEmit(docId, 'PDF_TEXT_EXTRACTION', { stepStatus: 'active' }, false, lang);
   await sleep(800);
-  await updateDocumentAndEmit(docId, 'PDF_TEXT_EXTRACTION', { stepStatus: 'completed' });
+  await updateDocumentAndEmit(docId, 'PDF_TEXT_EXTRACTION', { stepStatus: 'completed' }, false, lang);
 
-  await updateDocumentAndEmit(docId, 'OCR_ANALYSIS', { stepStatus: 'active' });
+  await updateDocumentAndEmit(docId, 'OCR_ANALYSIS', { stepStatus: 'active' }, false, lang);
   let layer1Result: any = { matchPercent: 98, hiddenTextDetected: false };
   if (mimeType.includes('pdf')) {
     layer1Result = await analyzeDocumentLayer1(fileBuffer);
   } else {
     await sleep(1500); // Simulate OCR
   }
-  await updateDocumentAndEmit(docId, 'OCR_ANALYSIS', { stepStatus: 'completed' });
+  await updateDocumentAndEmit(docId, 'OCR_ANALYSIS', { stepStatus: 'completed' }, false, lang);
 
-  await updateDocumentAndEmit(docId, 'TEXT_COMPARISON', { stepStatus: 'active' });
+  await updateDocumentAndEmit(docId, 'TEXT_COMPARISON', { stepStatus: 'active' }, false, lang);
   await sleep(800);
-  await updateDocumentAndEmit(docId, 'TEXT_COMPARISON', { stepStatus: 'completed' });
+  await updateDocumentAndEmit(docId, 'TEXT_COMPARISON', { stepStatus: 'completed' }, false, lang);
 
   const hasExtraText = layer1Result.extraTextSegments && layer1Result.extraTextSegments.length > 0;
   const matchPercent = layer1Result.matchPercent || 95;
-  const differenceSnippet = hasExtraText ? layer1Result.extraTextSegments[0] : (matchPercent < 100 ? 'OCR və PDF daxili mətn qatı arasında kiçik fərqlilik aşkar edildi.' : '');
+  const differenceSnippet = hasExtraText ? layer1Result.extraTextSegments[0] : (matchPercent < 100 ? translate('ocr_diff_detected', lang) : '');
 
   await updateDocumentAndEmit(docId, 'HIDDEN_TEXT_DETECTION', { 
     stepStatus: 'completed',
@@ -196,14 +206,14 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       extraTextSegments: layer1Result.extraTextSegments || [],
       textDifferenceFound: hasExtraText || matchPercent < 100,
       differenceSnippet,
-      ocrText: layer1Result.ocrText || `Skan edilmiş OCR mətni: ${filename}`,
-      pdfTextLayer: layer1Result.pdfTextLayer || `PDF daxili raw text qatı: ${filename}`,
+      ocrText: layer1Result.ocrText || `OCR: ${filename}`,
+      pdfTextLayer: layer1Result.pdfTextLayer || `PDF text: ${filename}`,
       status: layer1Result.hiddenTextDetected || matchPercent < 100 ? 'suspicious' : 'clean'
     }
-  });
+  }, false, lang);
 
   // Layer 2: RETVec + CNN ML Microservice Classification
-  await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { stepStatus: 'active' });
+  await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { stepStatus: 'active' }, false, lang);
 
   const fastApiResult = await classifyDocumentText({
     documentId: docId,
@@ -225,6 +235,7 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
   await sleep(1000);
   const isInjection = layer2Result.isInjection || false;
   const confidence = layer2Result.confidence || 0.95;
+  const mlMsg = isInjection ? translate('ml_injection_detected', lang) : translate('ml_safe_message', lang);
 
   await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { 
     stepStatus: 'completed',
@@ -233,16 +244,14 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       label: isInjection ? 'injection' : 'safe',
       confidence,
       accuracy: 0.98,
-      message: isInjection 
-        ? 'ML classifier tərəfindən mətn daxilində instruction override cəhdi aşkar edildi.'
-        : 'ML classifier tərəfindən sənəd hərtərəfli təhlil edildi, hər hansı prompt injection aşkar edilmədi.',
+      message: mlMsg,
       categories: layer2Result.matchedSignatures || [],
       requiresUserConfirmation: isInjection || layer1Result.hiddenTextDetected,
     }
-  });
+  }, false, lang);
 
   // Layer 3: Risk Assessment & LLM Security Evaluation
-  await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { stepStatus: 'active' });
+  await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { stepStatus: 'active' }, false, lang);
 
   const layer3Result = await evaluateLayer3SecurityLLM({
     filename,
@@ -252,6 +261,7 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
     matchPercent: layer1Result.matchPercent || 95,
     hiddenTextDetected: layer1Result.hiddenTextDetected || false,
     layer2Result,
+    lang,
   });
 
   await sleep(1000);
@@ -269,7 +279,7 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
     },
     finalRiskScore: overallRiskScore,
     finalStatus: status
-  }, true); // isFinal = true
+  }, true, lang); // isFinal = true
 }
 
 export async function getUserDocuments(userId: string): Promise<DocumentListItem[]> {

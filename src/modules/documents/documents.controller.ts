@@ -9,19 +9,23 @@ import {
 } from './documents.service.js';
 import { AppError } from '../../errors/AppError.js';
 
+import { parseLanguage } from '../../utils/i18n.js';
+
 export async function uploadDocument(req: AuthenticatedRequest, res: Response) {
   if (!req.file) {
     throw new AppError('Fayl tapılmadı (No file provided)', 400);
   }
 
   const userId = req.user?.uid || 'dev-user-123';
-  console.log(`[Document Controller] Processing upload for user ${userId}: ${req.file.originalname}`);
+  const lang = parseLanguage(req.headers['accept-language'] || (req.query.lang as string));
+  console.log(`[Document Controller] Processing upload for user ${userId} (lang: ${lang}): ${req.file.originalname}`);
 
   const result = await processAndSaveDocument(
     req.file.buffer,
     req.file.originalname,
     req.file.mimetype,
-    userId
+    userId,
+    lang
   );
 
   res.json({
