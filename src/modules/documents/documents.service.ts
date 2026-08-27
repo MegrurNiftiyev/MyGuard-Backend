@@ -45,13 +45,15 @@ async function updateDocumentAndEmit(docId: string, step: ScanStep, patch: Parti
     if (lastStep && !lastStep.finishedAt) {
       lastStep.finishedAt = now;
       lastStep.status = patch.stepStatus;
+      lastStep.message = stepMessages[step] || 'Mərhələ tamamlandı';
     }
   } else if (patch.stepStatus === 'active') {
     doc.stepHistory.push({
       step,
       startedAt: now,
       finishedAt: null,
-      status: 'completed' // Will be updated when finished
+      status: 'completed', // Will be updated when finished
+      message: stepMessages[step] || 'Mərhələ icra olunur',
     });
   }
 
@@ -180,15 +182,21 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
   await sleep(800);
   await updateDocumentAndEmit(docId, 'TEXT_COMPARISON', { stepStatus: 'completed' });
 
+  const hasExtraText = layer1Result.extraTextSegments && layer1Result.extraTextSegments.length > 0;
+  const matchPercent = layer1Result.matchPercent || 95;
+  const differenceSnippet = hasExtraText ? layer1Result.extraTextSegments[0] : (matchPercent < 100 ? 'OCR və PDF daxili mətn qatı arasında kiçik fərqlilik aşkar edildi.' : '');
+
   await updateDocumentAndEmit(docId, 'HIDDEN_TEXT_DETECTION', { stepStatus: 'active' });
   await sleep(800);
   await updateDocumentAndEmit(docId, 'HIDDEN_TEXT_DETECTION', { 
     stepStatus: 'completed',
     layer1_ocrTextMatch: {
-      matchPercent: layer1Result.matchPercent || 95,
+      matchPercent,
       hiddenTextDetected: layer1Result.hiddenTextDetected,
       extraTextSegments: layer1Result.extraTextSegments || [],
-      status: layer1Result.hiddenTextDetected ? 'suspicious' : 'clean'
+      textDifferenceFound: hasExtraText || matchPercent < 100,
+      differenceSnippet,
+      status: layer1Result.hiddenTextDetected || matchPercent < 100 ? 'suspicious' : 'clean'
     }
   });
 
@@ -196,13 +204,21 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
   await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { stepStatus: 'active' });
   const layer2Result = await runMockLayer2Classifier(filename, layer1Result.hiddenTextDetected);
   await sleep(1500);
+  const isInjection = layer2Result.isInjection || false;
+  const confidence = layer2Result.confidence || 0.95;
+
   await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { 
     stepStatus: 'completed',
-    isContainInjection: layer2Result.isInjection || false,
+    isContainInjection: isInjection,
     layer2_classification: {
-      label: layer2Result.isInjection ? 'injection' : 'safe',
-      confidence: layer2Result.confidence || 0.95,
-      categories: layer2Result.isInjection ? ['Instruction Override'] : []
+      label: isInjection ? 'injection' : 'safe',
+      confidence,
+      accuracy: 0.98,
+      message: isInjection 
+        ? 'ML classifier tərəfindən mətn daxilində instruction override cəhdi aşkar edildi.'
+        : 'ML classifier tərəfindən sənəd hərtərəfli təhlil edildi, hər hansı prompt injection aşkar edilmədi.',
+      categories: isInjection ? ['Instruction Override'] : [],
+      requiresUserConfirmation: isInjection || layer1Result.hiddenTextDetected,
     }
   });
 
@@ -211,14 +227,20 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
   const layer3Result = await runMockLayer3SecurityLLM(filename, layer1Result, layer2Result);
   await sleep(1000);
   
-  const overallRiskScore = layer1Result.hiddenTextDetected ? 92 : layer2Result.isInjection ? 85 : 12;
+  const overallRiskScore = layer1Result.hiddenTextDetected ? 92 : isInjection ? 85 : 12;
   const status: RiskStatus = overallRiskScore > 80 ? 'high_risk' : overallRiskScore > 30 ? 'suspicious' : 'safe';
 
   await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { 
     stepStatus: 'completed',
     layer3_llmReview: {
       used: overallRiskScore > 60,
-      explanation: layer3Result.explanation
+      explanation: layer3Result.explanation,
+      message: layer3Result.explanation,
+      recommendedAction: overallRiskScore > 80 
+        ? 'Sənədin daxili AI modellərinə ötürülməsi BLOKLANMALIDIR. Təmizlənmiş versiyanı istifadə edin.' 
+        : overallRiskScore > 30 
+        ? 'Sənəd şübhəlidir. İstifadəçi tərəfindən manual təsdiqlənməyə ehtiyac var.' 
+        : 'Sənəd təhlükəsizdir. İcra oluna bilər.',
     },
     finalRiskScore: overallRiskScore,
     finalStatus: status

@@ -45,24 +45,32 @@ export interface Document {
     startedAt: string;
     finishedAt: string | null;
     status: 'completed' | 'error';
+    message: string;
   }[];
 
   layer1_ocrTextMatch: {
     matchPercent: number;
     hiddenTextDetected: boolean;
     extraTextSegments: string[];
+    textDifferenceFound: boolean;
+    differenceSnippet: string;
     status: 'clean' | 'suspicious';
   } | null;
 
   layer2_classification: {
     label: 'safe' | 'suspicious' | 'injection';
     confidence: number;
+    accuracy: number;
+    message: string;
     categories: string[];
+    requiresUserConfirmation: boolean;
   } | null;
 
   layer3_llmReview: {
     used: boolean;
     explanation: string | null;
+    message: string | null;
+    recommendedAction: string | null;
   } | null;
 
   finalRiskScore: number | null;
