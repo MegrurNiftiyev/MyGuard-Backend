@@ -64,15 +64,16 @@ router.post('/session', catchAsync(createSession));
  *         application/json:
  *           schema:
  *             type: object
- *             required: [chatMode, screenDestination, message]
+ *             required: [message]
  *             properties:
  *               chatMode:
  *                 type: string
  *                 enum: [SMALL_CHAT, LARGE_CHAT]
- *                 example: "SMALL_CHAT"
+ *                 example: "LARGE_CHAT"
  *               screenDestination:
  *                 type: string
- *                 example: "Dashboard"
+ *                 enum: [HOME_SCREEN, DOCUMENTS_SCREEN, SCAN_SCREEN, SETTINGS_SCREEN, AI_SCREEN]
+ *                 example: "DOCUMENTS_SCREEN"
  *               message:
  *                 type: string
  *                 example: "Salam, sənədlərdə olan prompt injection təhdidləri haqqında məlumat ver."
