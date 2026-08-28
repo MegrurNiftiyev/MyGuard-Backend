@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../../types/index.js';
 import { getUserProfile } from '../auth/auth.service.js';
+import { AppError } from '../../errors/AppError.js';
 
 /**
  * Get current authenticated user details (Me)

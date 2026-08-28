@@ -107,9 +107,34 @@ export async function logSmallChatMessage(entry: SmallChatLogEntry) {
 }
 
 export async function callLlmSmall(systemPrompt: string, message: string): Promise<string> {
-  // In a real scenario, this would call the actual LLM with systemPrompt and message
-  // For now, return a mock response that obeys the 1-3 sentences rule.
-  return `Bu xüsusi sorğunuz üçün test cavabıdır. Sistem hazırda mock rejimindədir və real LLM-ə qoşulmayıb. Sorğunuz qeydə alındı.`;
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: env.OPENAI_MODEL || 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ],
+        temperature: 0.7,
+        max_tokens: 300
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API failed: ${response.status} ${await response.text()}`);
+    }
+
+    const json = await response.json();
+    return json.choices[0].message.content || 'Cavab formalaşdırıla bilmədi.';
+  } catch (err: any) {
+    console.error(`[Chat Service] Small Chat Error: ${err.message}`);
+    return 'Üzr istəyirik, təhlil zamanı xəta baş verdi və ya AI servisi əlçatmazdır.';
+  }
 }
 
 export async function callLlmLarge(systemPrompt: string, history: LargeChatMessage[], message: string, screenDestination?: string, userId: string = 'dev-user-123'): Promise<MessageBlock[]> {

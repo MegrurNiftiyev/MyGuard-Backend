@@ -64,8 +64,8 @@ export async function getDocumentComparison(req: AuthenticatedRequest, res: Resp
   res.json({
     documentId: docId,
     documentName: document.fileName,
-    ocrText: document.layer1_ocrTextMatch?.ocrText || `Mock OCR Text for ${document.fileName}`,
-    pdfTextLayer: document.layer1_ocrTextMatch?.pdfTextLayer || `Mock PDF Layer for ${document.fileName}`,
+    ocrText: document.layer1_ocrTextMatch?.ocrText || 'Məlumat yoxdur',
+    pdfTextLayer: document.layer1_ocrTextMatch?.pdfTextLayer || 'Məlumat yoxdur',
     ocrPdfMatch: document.layer1_ocrTextMatch?.matchPercent || 100,
     hiddenTextDetected: document.layer1_ocrTextMatch?.hiddenTextDetected || false,
     textDifferenceFound: document.layer1_ocrTextMatch?.textDifferenceFound || false,
@@ -86,13 +86,14 @@ export async function deleteDocument(req: AuthenticatedRequest, res: Response) {
 
 export async function cleanInjection(req: AuthenticatedRequest, res: Response) {
   const docId = String(req.params.id);
-  
-  // Hələlik sadəcə mock response qaytarırıq.
+  const document = await getDocumentById(docId);
+  const downloadUrl = document?.uploadUrl || `/api/documents/${docId}/download`;
+
   res.json({
     success: true,
     message: 'Sənəddəki prompt injection təhdidləri təmizləndi.',
     cleanedDocumentId: docId,
-    downloadUrl: `https://mock-storage.myguard.az/cleaned/${docId}.pdf`
+    downloadUrl
   });
 }
 

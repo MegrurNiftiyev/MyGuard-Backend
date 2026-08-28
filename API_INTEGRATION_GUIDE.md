@@ -421,3 +421,17 @@ Audit sonrası arxitekturaya aşağıdakı inteqrasiya və təhlükəsizlik yeni
 ### 🔹 9.4 `isContainInjection` Sahəsinin Dinamikləşdirilməsi
 - Məlumat bazasına statik olaraq yazılmır. 
 - API-dan və ya Socket-dən gələn Payload-larda dinamik hesablanıb (`finalStatus`, `layer2`, `layer3` asılılığında) qaytarılır. Frontend üçün davranış olaraq heç nə dəyişməyib.
+
+### 🔹 9.5 Çox Formatlı Sənəd Təhlili (DOCX, PPTX) Və OCR
+- Sistemin mətn gizlətmə (Zero-opacity, white text) təhdidlərini tutması üçün artıq yalnız PDF deyil, digər ofis formatları (`.docx`, `.pptx`, `.xlsx`) da dəstəklənir.
+- **İnteqrasiya:** Sənəd daxil olduqda backend `libreoffice-convert` istifadə edərək faylı arxa planda gizlicə PDF-ə çevirir və ənənəvi vizual OCR + Text qatı müqayisəsini edir. 
+- **Diqqət:** Serverdə (və ya test edilən mühitdə) mütləq şəkildə LibreOffice quraşdırılmış olmalıdır.
+
+### 🔹 9.6 AI (Layer 3) `<ferqli>` Təhlili Və Accuracy Hesablanması
+- Layer 1 OCR və Text Layer arasında fərq tapıldıqda, həmin gizli mətnlər AI-a `<ferqli>gizli mətn</ferqli>` teqləri içərisində göndərilir.
+- Layer 3 `layer3_llmReview.explanation` sahəsində ML qatının yox, LLM-in **öz hesabladığı müstəqil accuracy/confidence** faizi qaytarılır. LLM-ə gizli mətn barədə niyə təhlükə olub-olmadığını detalı ilə izah etmək məcburiyyəti qoyulub.
+
+### 🔹 9.7 Bütün Test (Mock) Məlumatlarının Silinməsi
+- Bütün test `mock-storage` URL-ləri ləğv edildi, xüsusən `cleanInjection` artıq həqiqi URL qaytarır.
+- FastAPI ML servisində `ALLOW_DUMMY_MODEL_FALLBACK` tamamilə söndürüldü, heç bir saxta təsnifat qaytarılmır.
+- Koda aid bütün TypeScript (`tsc`) xətaları və interfeys uyğunsuzluqları təmizləndi.

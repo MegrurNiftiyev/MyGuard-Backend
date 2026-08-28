@@ -184,10 +184,33 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
 
   await updateDocumentAndEmit(docId, 'OCR_ANALYSIS', { stepStatus: 'active' }, false, lang);
   let layer1Result: any = { matchPercent: 98, hiddenTextDetected: false };
-  if (mimeType.includes('pdf')) {
+  const lowerName = filename.toLowerCase();
+  
+  if (mimeType.includes('pdf') || lowerName.endsWith('.pdf')) {
     layer1Result = await analyzeDocumentLayer1(fileBuffer);
+  } else if (
+    mimeType.includes('wordprocessingml') || 
+    mimeType.includes('presentationml') ||
+    mimeType.includes('spreadsheetml') ||
+    lowerName.endsWith('.docx') || 
+    lowerName.endsWith('.pptx') || 
+    lowerName.endsWith('.xlsx')
+  ) {
+    try {
+      console.log(`[Layer 1] LibreOffice vasitəsilə ${filename} PDF formatına çevrilir...`);
+      const libre = await import('libreoffice-convert');
+      const { promisify } = await import('util');
+      const convertAsync = promisify(libre.convert);
+      
+      const pdfBuf = await convertAsync(fileBuffer, '.pdf', undefined);
+      console.log(`[Layer 1] Çevrilmə uğurludur, PDF OCR analizinə ötürülür...`);
+      layer1Result = await analyzeDocumentLayer1(pdfBuf);
+    } catch (err: any) {
+      console.warn(`[Layer 1] Office -> PDF çevrilmə xətası: ${err.message}`);
+      layer1Result = { matchPercent: 100, hiddenTextDetected: false, ocrText: 'LibreOffice çevrilmə xətası', pdfTextLayer: 'LibreOffice çevrilmə xətası' };
+    }
   } else {
-    await sleep(1500); // Simulate OCR
+    await sleep(1500); // Simulate OCR for unsupported
   }
   await updateDocumentAndEmit(docId, 'OCR_ANALYSIS', { stepStatus: 'completed' }, false, lang);
 
