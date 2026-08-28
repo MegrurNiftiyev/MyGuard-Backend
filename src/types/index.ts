@@ -124,13 +124,7 @@ export interface ThreatItem {
   severity: 'low' | 'medium' | 'high' | 'critical';
 }
 
-export interface StructuredAiAnalysis {
-  riskSeverity: string;
-  detectedThreat: string;
-  confidence: string;
-  reason: string;
-  recommendation: string;
-}
+
 
 export type AiMessageBlock =
   | { type: 'header'; title: string; subtitle?: string }
@@ -161,7 +155,6 @@ export type MessageBlockType =
   | 'text' 
   | 'chart' 
   | 'table' 
-  | 'analysis' 
   | 'callout' 
   | 'link' 
   | 'file' 
@@ -191,7 +184,6 @@ export interface MessageBlock {
   tableData?: { headers: string[]; rows: (string | number)[][] };
   headers?: string[];
   rows?: (string | number)[][];
-  analysisData?: StructuredAiAnalysis;
   tone?: 'primary' | 'secondary' | 'danger' | 'warning' | 'success' | 'info' | 'purple' | 'indigo';
   url?: string;
   label?: string;

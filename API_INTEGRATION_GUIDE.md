@@ -11,7 +11,7 @@ Frontend `mockData.ts`, "Yekun Vahid API Müqaviləsi" və backend-in real imple
 - **Canlı Backend Base URL (Production):** `https://myguard-backend-i4ll.onrender.com`
 - **İnteraktiv Swagger UI Sənədləşməsi:** `https://myguard-backend-i4ll.onrender.com/api-docs`
 - **Real-Time WebSocket (Socket.IO):** `https://myguard-backend-i4ll.onrender.com`
-- **Python FastAPI ML Microservice URL:** `http://localhost:8000` (Canlıda: `https://myguard-ai-backend.onrender.com`)
+- **Python FastAPI ML Microservice URL:** `https://myguard-ai-backend.onrender.com`
 - **Standart Sorğu Başlıqları (Headers):**
   ```http
   Accept: application/json
@@ -397,3 +397,27 @@ AI Asistent modelinin backend tərəfində JSON formalı cavablar verməsi və e
 - **`SCAN_SCREEN`**: Canlı 7 mərhələli skan boru xəttinə və təhlükəsizlik addımlarına fokuslanır.
 - **`SETTINGS_SCREEN`**: Platform konfiqurasiyalarına və threshold tənzimləmələrinə fokuslanır.
 - **`AI_SCREEN`**: Master Security Operations Center rejimidir — tam analitik hesabatlar və qrafiklər generasiya edilir.
+
+---
+
+## 🚀 9. Post-Audit Yenilikləri Və İnteqrasiya Tələbləri (Avqust 2026)
+
+Audit sonrası arxitekturaya aşağıdakı inteqrasiya və təhlükəsizlik yenilikləri əlavə edilmişdir:
+
+### 🔹 9.1 Auth Və Security
+- `GET /api/users/me` və `POST /api/auth/logout` endpoint-ləri **tamamilə** `requireAuth` ilə qorunur. Token olmadan çağırışlar dərhal `401 Unauthorized` xətası qaytaracaq.
+
+### 🔹 9.2 Layer 2 (FastAPI ML) Fallback & Retry
+- `POST /classify` (Layer 2) çağırışları uğursuz olduqda dərhal mock modelə keçmir. 
+- Yalnız `.env`-də `USE_MOCK_LAYER2=true` quraşdırıldıqda mock işləyir. Əks halda xəta aşkar şəkildə frontend-ə ötürülür və `stepStatus: 'error'` olaraq, `errorDetail: 'FastAPI classifier unavailable'` formunda Socket ilə bildirilir.
+- Daxili xidmətlər arası `X-Internal-Token` üçün təkrar yoxlama (1 retry, 10s timeout) məntiqi əlavə edilmişdir.
+
+### 🔹 9.3 LARGE_CHAT Və OpenAI Tool-Calling
+- `chatMode: 'LARGE_CHAT'` rejimi artıq birbaşa OpenAI (`gpt-4o-mini`) ilə idarə olunur və **Tool-Calling (Function Calling)** vasitəsilə canlı məlumat çəkir.
+- Hazırkı inteqrasiya edilmiş Tool-lar:
+  - `get_risk_summary`: Canlı Risk xülasəsini çəkir (`Dashboard` üçün).
+  - `get_document_analysis`: Seçilmiş Document ID üzrə OCR və PDF fərqliliklərini oxuyur.
+
+### 🔹 9.4 `isContainInjection` Sahəsinin Dinamikləşdirilməsi
+- Məlumat bazasına statik olaraq yazılmır. 
+- API-dan və ya Socket-dən gələn Payload-larda dinamik hesablanıb (`finalStatus`, `layer2`, `layer3` asılılığında) qaytarılır. Frontend üçün davranış olaraq heç nə dəyişməyib.

@@ -6,7 +6,10 @@ import { getUserProfile } from '../auth/auth.service.js';
  * Get current authenticated user details (Me)
  */
 export async function getMe(req: AuthenticatedRequest, res: Response) {
-  const uid = req.user?.uid || 'usr-admin-001';
+  if (!req.user || !req.user.uid) {
+    throw new AppError('Avtorizasiya olunmayıb', 401);
+  }
+  const uid = req.user.uid;
   const user = await getUserProfile(uid);
   res.json({ success: true, user });
 }

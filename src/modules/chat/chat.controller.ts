@@ -50,7 +50,8 @@ export async function sendMessage(req: AuthenticatedRequest, res: Response) {
   }
 
   const history = await getChatHistory(sessionId, 10);
-  const blocks = await callLlmLarge(systemPrompt, history, message);
+  const userId = req.user?.uid || 'dev-user-123';
+  const blocks = await callLlmLarge(systemPrompt, history, message, screenDestination, userId);
   const reply: LargeChatMessage = await appendToHistory(sessionId, message, blocks);
   
   return res.json(reply);

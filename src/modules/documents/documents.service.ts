@@ -21,6 +21,7 @@ const stepMessages: Record<ScanStep, string> = {
 };
 
 function pickSocketFields(doc: Document): ScanSocketEvent['fileData'] {
+  const derivedInjection = doc.finalStatus === 'high_risk' || doc.layer2_classification?.label === 'injection' || doc.layer3_llmReview?.isMalicious === true;
   return {
     currentStep: doc.currentStep,
     stepStatus: doc.stepStatus,
@@ -29,7 +30,7 @@ function pickSocketFields(doc: Document): ScanSocketEvent['fileData'] {
     layer3_llmReview: doc.layer3_llmReview,
     finalRiskScore: doc.finalRiskScore,
     finalStatus: doc.finalStatus,
-    isContainInjection: doc.isContainInjection,
+    isContainInjection: derivedInjection,
     scanStartedAt: doc.scanStartedAt,
     scanFinishedAt: doc.scanFinishedAt,
     scanDurationMs: doc.scanDurationMs,
@@ -223,25 +224,37 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
     language: lang,
   });
 
-  const layer2Result: Layer2ClassifierResult = fastApiResult
-    ? {
-        classification: fastApiResult.label === 'injection' ? 'High Risk' : fastApiResult.label === 'suspicious' ? 'Suspicious' : 'Safe',
-        confidence: fastApiResult.confidence,
-        isInjection: fastApiResult.label === 'injection',
-        riskCategory: fastApiResult.label === 'injection' ? 'Prompt Injection' : 'None',
-        matchedSignatures: fastApiResult.categories || [],
-      }
-    : await runMockLayer2Classifier(filename, layer1Result.hiddenTextDetected);
+  let layer2Result: Layer2ClassifierResult | null = null;
+  
+  if (fastApiResult) {
+    layer2Result = {
+      classification: fastApiResult.label === 'injection' ? 'High Risk' : fastApiResult.label === 'suspicious' ? 'Suspicious' : 'Safe',
+      confidence: fastApiResult.confidence,
+      isInjection: fastApiResult.label === 'injection',
+      riskCategory: fastApiResult.label === 'injection' ? 'Prompt Injection' : 'None',
+      matchedSignatures: fastApiResult.categories || [],
+    };
+  } else if (process.env.USE_MOCK_LAYER2 === 'true') {
+    console.log(`[Document Service] FastAPI unavailable. Using mock Layer 2 classifier because USE_MOCK_LAYER2=true.`);
+    layer2Result = await runMockLayer2Classifier(filename, layer1Result.hiddenTextDetected);
+  } else {
+    console.error(`[Document Service] FastAPI Layer 2 classification failed and mock is disabled.`);
+  }
 
   await sleep(1000);
-  const isInjection = layer2Result.isInjection || false;
-  const confidence = layer2Result.confidence || 0.95;
-  const mlMsg = isInjection ? translate('ml_injection_detected', lang) : translate('ml_safe_message', lang);
+  
+  const isInjection = layer2Result?.isInjection || false;
+  const confidence = layer2Result?.confidence || 0;
+  const mlMsg = !layer2Result 
+    ? translate('ml_unavailable_message', lang) || 'Analiz natamamdır (ML servisi əlçatmazdır)'
+    : isInjection 
+      ? translate('ml_injection_detected', lang) 
+      : translate('ml_safe_message', lang);
 
   await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { 
-    stepStatus: 'completed',
-    isContainInjection: isInjection,
-    layer2_classification: {
+    stepStatus: !layer2Result ? 'error' : 'completed',
+    errorDetail: !layer2Result ? 'FastAPI classifier unavailable' : null,
+    layer2_classification: !layer2Result ? null : {
       label: isInjection ? 'injection' : 'safe',
       confidence,
       accuracy: 0.98,
@@ -250,6 +263,18 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       requiresUserConfirmation: isInjection || layer1Result.hiddenTextDetected,
     }
   }, false, lang);
+
+  if (!layer2Result) {
+    // We shouldn't stop the pipeline completely, but Layer 3 might need a layer2Result.
+    // Let's pass a dummy layer2Result to layer 3 so it doesn't crash, but keep the document status error.
+    layer2Result = {
+      classification: 'Safe',
+      confidence: 0,
+      isInjection: false,
+      riskCategory: 'None',
+      matchedSignatures: [],
+    };
+  }
 
   // Layer 3: Risk Assessment & LLM Security Evaluation
   await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { stepStatus: 'active' }, false, lang);
@@ -269,11 +294,9 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
   
   const overallRiskScore = layer1Result.hiddenTextDetected ? 92 : isInjection ? 85 : 12;
   const status: RiskStatus = overallRiskScore > 80 ? 'high_risk' : overallRiskScore > 30 ? 'suspicious' : 'safe';
-  const isContainInjection = Boolean(status === 'high_risk' || isInjection || layer3Result.isMalicious);
 
   await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { 
     stepStatus: 'completed',
-    isContainInjection,
     layer3_llmReview: {
       used: overallRiskScore > 60 || layer3Result.isMalicious,
       isMalicious: layer3Result.isMalicious,
@@ -316,22 +339,33 @@ export async function getUserDocuments(userId: string): Promise<DocumentListItem
 }
 
 export async function getDocumentById(docId: string): Promise<Document | undefined> {
+  let foundDoc: Document | undefined;
+
   if (isFirebaseInitialized && db) {
     try {
       const docSnap = await db.collection(COLLECTIONS.DOCUMENTS).doc(docId).get();
       if (docSnap.exists) {
-        return docSnap.data() as Document;
+        foundDoc = docSnap.data() as Document;
       }
     } catch (err) {
       console.warn('[Document Service] Firestore get fallback:', err);
     }
   }
 
-  const doc = memoryDocuments.get(docId);
-  if (doc) return doc;
+  if (!foundDoc) {
+    foundDoc = memoryDocuments.get(docId);
+  }
 
-  // Fallback demo document for frontend test & socket room preview IDs
-  return createDemoFallbackDocument(docId);
+  if (!foundDoc) {
+    // Fallback demo document for frontend test & socket room preview IDs
+    foundDoc = createDemoFallbackDocument(docId);
+  }
+
+  if (foundDoc) {
+    foundDoc.isContainInjection = foundDoc.finalStatus === 'high_risk' || foundDoc.layer2_classification?.label === 'injection' || foundDoc.layer3_llmReview?.isMalicious === true;
+  }
+
+  return foundDoc;
 }
 
 function createDemoFallbackDocument(docId: string): Document {

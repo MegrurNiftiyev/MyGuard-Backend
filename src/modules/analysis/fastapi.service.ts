@@ -38,42 +38,56 @@ export async function classifyDocumentText(
   const url = `${env.FASTAPI_ANALYSIS_URL}/classify`;
   console.log(`[FastAPI Service] Sending classification request to ${url} for doc: ${payload.documentId}`);
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  const maxRetries = 1;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Internal-Token': env.INTERNAL_SERVICE_TOKEN,
-        'Accept-Language': payload.language || 'az',
-      },
-      body: JSON.stringify({
-        documentId: payload.documentId,
-        text: payload.text || 'Empty document text',
-        ocrText: payload.ocrText || null,
-        hiddenText: payload.hiddenText || null,
-        language: payload.language || 'en',
-      }),
-      signal: controller.signal,
-    });
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Token': env.INTERNAL_SERVICE_TOKEN,
+          'Accept-Language': payload.language || 'az',
+        },
+        body: JSON.stringify({
+          documentId: payload.documentId,
+          text: payload.text || 'Empty document text',
+          ocrText: payload.ocrText || null,
+          hiddenText: payload.hiddenText || null,
+          language: payload.language || 'en',
+        }),
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      console.warn(`[FastAPI Service] Classification returned status ${response.status}: ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        console.warn(`[FastAPI Service] Classification returned status ${response.status}: ${errorText}`);
+        if (response.status >= 500 && attempt < maxRetries) {
+            console.log(`[FastAPI Service] Retrying... (${attempt + 1}/${maxRetries})`);
+            continue;
+        }
+        return null;
+      }
+
+      const data = (await response.json()) as ClassifyResponseData;
+      console.log(`[FastAPI Service] Classification result for ${payload.documentId}: label=${data.label}, confidence=${data.confidence}`);
+      return data;
+    } catch (err: any) {
+      console.warn(`[FastAPI Service] Connection failed to ${url} (Attempt ${attempt + 1}/${maxRetries + 1}): ${err?.message || err}`);
+      if (attempt < maxRetries) {
+         // Wait before retry
+         await new Promise(resolve => setTimeout(resolve, 2000));
+         continue;
+      }
+      console.error(`[FastAPI Service] All attempts failed to connect to ${url}.`);
       return null;
     }
-
-    const data = (await response.json()) as ClassifyResponseData;
-    console.log(`[FastAPI Service] Classification result for ${payload.documentId}: label=${data.label}, confidence=${data.confidence}`);
-    return data;
-  } catch (err: any) {
-    console.warn(`[FastAPI Service] Connection failed to ${url} (${err?.message || err}). Falling back to local classifier.`);
-    return null;
   }
+  return null;
 }
 
 /**

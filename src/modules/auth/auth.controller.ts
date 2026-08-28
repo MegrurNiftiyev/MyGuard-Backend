@@ -97,5 +97,8 @@ export async function loginSima(req: Request, res: Response) {
  * Logout
  */
 export async function logout(req: AuthenticatedRequest, res: Response) {
+  if (!req.user || !req.user.uid) {
+    throw new AppError('Avtorizasiya olunmayıb', 401);
+  }
   res.json({ success: true, message: 'Uğurla çıxış edildi.' });
 }

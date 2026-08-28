@@ -171,6 +171,6 @@ router.post('/sima', catchAsync(loginSima));
  *       200:
  *         description: Logout successful
  */
-router.post('/logout', /* requireAuth, */ catchAsync(logout));
+router.post('/logout', requireAuth, catchAsync(logout));
 
 export default router;
