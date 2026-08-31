@@ -51,7 +51,8 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
 
       let fullOcrText = '';
       for (let i = 0; i < images.length; i++) {
-        const { data: { text } } = await Tesseract.recognize(images[i], 'eng');
+        // Tesseract-ə Azərbaycan (aze) və İngilis (eng) dillərini birlikdə veririk
+        const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng');
         fullOcrText += text + ' ';
       }
       normalizedOcrText = normalizeText(fullOcrText);
