@@ -35,7 +35,7 @@ export async function sendMessage(req: AuthenticatedRequest, res: Response) {
   const mode = chatMode || 'LARGE_CHAT';
   const dest = screenDestination || 'AI_SCREEN';
 
-  const systemPrompt = getSystemPromptFor(dest, mode);
+  const systemPrompt = getSystemPromptFor(screenDestination);
 
   if (chatMode === ChatMode.SMALL_CHAT) {
     const reply = await callLlmSmall(systemPrompt, message);
