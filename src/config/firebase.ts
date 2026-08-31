@@ -30,6 +30,14 @@ try {
       });
       isFirebaseInitialized = true;
       console.log(`[Firebase Admin] Initialized via service account file: ${env.FIREBASE_SERVICE_ACCOUNT_PATH}`);
+    } else if (fs.existsSync('/etc/secrets/mygurad-firebase-admin.json')) {
+      const serviceAccount = JSON.parse(fs.readFileSync('/etc/secrets/mygurad-firebase-admin.json', 'utf8'));
+      app = initializeApp({
+        credential: cert(serviceAccount),
+        storageBucket: env.FIREBASE_STORAGE_BUCKET || `${serviceAccount.project_id}.appspot.com`,
+      });
+      isFirebaseInitialized = true;
+      console.log(`[Firebase Admin] Initialized via Render secret file: /etc/secrets/mygurad-firebase-admin.json`);
     } else {
       console.warn('[Firebase Admin] Notice: Operating in local memory/mock fallback mode until serviceAccountKey.json is provided.');
     }
