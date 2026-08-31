@@ -209,10 +209,11 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       console.warn(`[Layer 1] Office -> PDF çevrilmə xətası: ${err.message}`);
       layer1Result = { 
         matchPercent: 0, 
-        hiddenTextDetected: true, 
-        extraTextSegments: ['[ERROR] LibreOffice çevrilmə xətası: DOCX sənədi oxuna bilmədi. Sənəd şübhəli olaraq işarələnir.'],
-        ocrText: 'XƏTA: Oxuna bilmədi', 
-        pdfTextLayer: 'XƏTA: Oxuna bilmədi' 
+        hiddenTextDetected: false, 
+        extraTextSegments: [],
+        ocrText: 'XƏTA: Sənəd oxuna bilmədi', 
+        pdfTextLayer: 'XƏTA: Sənəd oxuna bilmədi',
+        isSystemError: true
       };
     }
   } else {
@@ -308,21 +309,35 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
   // Layer 3: Risk Assessment & LLM Security Evaluation
   await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { stepStatus: 'active' }, false, lang);
 
-  const layer3Result = await evaluateLayer3SecurityLLM({
-    filename,
-    ocrText: layer1Result.ocrText,
-    pdfTextLayer: layer1Result.pdfTextLayer,
-    extraTextSegments: layer1Result.extraTextSegments,
-    matchPercent: layer1Result.matchPercent || 95,
-    hiddenTextDetected: layer1Result.hiddenTextDetected || false,
-    layer2Result,
-    lang,
-  });
+  let layer3Result;
+  if (layer1Result.isSystemError) {
+    layer3Result = {
+      isMalicious: false,
+      confidence: 1,
+      explanation: 'Sənəd oxuna bilmədiyi üçün (konversiya xətası) süni intellekt analizi aparılmadı.',
+      recommendedAction: 'Zəhmət olmasa sənədi PDF formatında yenidən yükləyin.',
+      attackVector: 'N/A',
+      reasoning: 'System Error: LibreOffice conversion failed.',
+      mitigationSteps: [],
+    };
+  } else {
+    layer3Result = await evaluateLayer3SecurityLLM({
+      filename,
+      ocrText: layer1Result.ocrText,
+      pdfTextLayer: layer1Result.pdfTextLayer,
+      extraTextSegments: layer1Result.extraTextSegments,
+      matchPercent: layer1Result.matchPercent || 95,
+      hiddenTextDetected: layer1Result.hiddenTextDetected || false,
+      layer2Result,
+      lang,
+    });
+  }
 
   await sleep(1000);
   
-  const overallRiskScore = layer1Result.hiddenTextDetected ? 92 : isInjection ? 85 : 12;
-  const status: RiskStatus = overallRiskScore > 80 ? 'high_risk' : overallRiskScore > 30 ? 'suspicious' : 'safe';
+  const overallRiskScore = layer1Result.isSystemError ? 0 : (layer1Result.hiddenTextDetected ? 92 : isInjection ? 85 : 12);
+  const status: RiskStatus = layer1Result.isSystemError ? 'safe' : (overallRiskScore > 80 ? 'high_risk' : overallRiskScore > 30 ? 'suspicious' : 'safe');
+
 
   await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { 
     stepStatus: 'completed',
