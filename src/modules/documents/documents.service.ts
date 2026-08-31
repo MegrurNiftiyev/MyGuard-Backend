@@ -207,7 +207,13 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       layer1Result = await analyzeDocumentLayer1(pdfBuf);
     } catch (err: any) {
       console.warn(`[Layer 1] Office -> PDF çevrilmə xətası: ${err.message}`);
-      layer1Result = { matchPercent: 100, hiddenTextDetected: false, ocrText: 'LibreOffice çevrilmə xətası', pdfTextLayer: 'LibreOffice çevrilmə xətası' };
+      layer1Result = { 
+        matchPercent: 0, 
+        hiddenTextDetected: true, 
+        extraTextSegments: ['[ERROR] LibreOffice çevrilmə xətası: DOCX sənədi oxuna bilmədi. Sənəd şübhəli olaraq işarələnir.'],
+        ocrText: 'XƏTA: Oxuna bilmədi', 
+        pdfTextLayer: 'XƏTA: Oxuna bilmədi' 
+      };
     }
   } else {
     await sleep(1500); // Simulate OCR for unsupported

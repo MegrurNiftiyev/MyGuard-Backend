@@ -121,7 +121,7 @@ export async function callLlmSmall(systemPrompt: string, message: string): Promi
           { role: 'user', content: message }
         ],
         temperature: 0.7,
-        max_tokens: 300
+        max_tokens: 1500
       })
     });
 
