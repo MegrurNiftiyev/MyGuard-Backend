@@ -29,19 +29,35 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
     const normalizedPdfText = normalizeText(fullPdfText);
     console.log('[Layer 1] PDF text-layer çıxarıldı, uzunluq:', normalizedPdfText.length);
 
-    let normalizedOcrText = normalizedPdfText;
+    let normalizedOcrText = '';
     try {
-      const { convert } = await import('pdf-img-convert');
-      const images = await convert(pdfBuffer, { scale: 2 });
+      let images: Buffer[] = [];
+      try {
+        const { convert } = await import('pdf-img-convert');
+        const converted = await convert(pdfBuffer, { scale: 2 });
+        images = converted.map((img: any) => Buffer.from(img));
+      } catch (pdfImgErr) {
+        console.log('[Layer 1] pdf-img-convert canvas fallback -> using @napi-rs/canvas rendering...');
+        const { createCanvas } = await import('@napi-rs/canvas');
+        for (let i = 1; i <= numPages; i++) {
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 2 });
+          const canvas = createCanvas(viewport.width, viewport.height);
+          const ctx = canvas.getContext('2d');
+          await page.render({ canvasContext: ctx as any, canvas: canvas as any, viewport }).promise;
+          images.push(canvas.toBuffer('image/png'));
+        }
+      }
+
       let fullOcrText = '';
       for (let i = 0; i < images.length; i++) {
-        const imgBuffer = Buffer.from(images[i]);
-        const { data: { text } } = await Tesseract.recognize(imgBuffer, 'eng');
+        const { data: { text } } = await Tesseract.recognize(images[i], 'eng');
         fullOcrText += text + ' ';
       }
       normalizedOcrText = normalizeText(fullOcrText);
-    } catch (canvasErr) {
-      console.warn('[Layer 1] Native canvas module missing or rasterization skipped. Using text-layer fallback.');
+    } catch (canvasErr: any) {
+      console.warn('[Layer 1] Canvas rendering or OCR error. Using text-layer fallback:', canvasErr?.message);
+      normalizedOcrText = normalizedPdfText;
     }
 
     const matchFraction = stringSimilarity.compareTwoStrings(normalizedPdfText, normalizedOcrText);
