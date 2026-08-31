@@ -13,4 +13,5 @@ export const env = {
   JWT_SECRET: process.env.JWT_SECRET || 'myguard-super-secret-jwt-key-2026',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
   OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  GOOGLE_VISION_API_KEY: process.env.GOOGLE_VISION_API_KEY || '',
 };
