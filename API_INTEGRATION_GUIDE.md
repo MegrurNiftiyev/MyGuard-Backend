@@ -449,3 +449,89 @@ Audit sonrası arxitekturaya aşağıdakı inteqrasiya və təhlükəsizlik yeni
 - Bütün test `mock-storage` URL-ləri ləğv edildi, xüsusən `cleanInjection` artıq həqiqi URL qaytarır.
 - FastAPI ML servisində `ALLOW_DUMMY_MODEL_FALLBACK` tamamilə söndürüldü, heç bir saxta təsnifat qaytarılmır.
 - Koda aid bütün TypeScript (`tsc`) xətaları və interfeys uyğunsuzluqları təmizləndi.
+
+---
+
+## 🎯 10. Web Frontend İnteqrasiya Planı (Step-by-Step Implementation Steps)
+
+Web Frontend tətbiqini yenilənmiş Backend API-a 100% uyğunlaşdırmaq üçün aşağıdakı 4 addımı icra edin:
+
+### 📍 Addım 1: `apiClient.ts` Faylında `Accept-Language` Quraşdırılması
+Bütün API sorğularına istifadəçinin tətbiqdə seçdiyi dili ötürmək üçün `Accept-Language` header-ini əlavə edin:
+```typescript
+// src/services/apiClient.ts
+const BASE_URL = 'https://mygurad-backend-v2.onrender.com/api';
+
+export async function apiClient<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = localStorage.getItem('access_token');
+  const currentLang = localStorage.getItem('app_language') || 'az'; // az, en, ru, tr
+
+  const headers: HeadersInit = {
+    'Accept': 'application/json',
+    'Accept-Language': currentLang,
+    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+
+  const response = await fetch(`${BASE_URL}${endpoint}`, { ...options, headers });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.message || `HTTP error ${response.status}`);
+  }
+  return response.json();
+}
+```
+
+### 📍 Addım 2: Sənəd Yükləmədə `isConfidential` Rejimi (`UploadModal.tsx`)
+Məxfi sənədlərin LLM (Süni İntellekt) mərhələsindən kənar tutulması üçün yükləmə zamanı `FormData`-ya `isConfidential` bayrağını əlavə edin:
+```typescript
+// src/services/documentsService.ts
+export async function uploadDocument(file: File, isConfidential: boolean = false) {
+  const formData = new FormData();
+  formData.append('document', file);
+  formData.append('isConfidential', isConfidential ? 'true' : 'false');
+
+  return apiClient<{ success: boolean; document: any }>('/documents/upload', {
+    method: 'POST',
+    body: formData,
+  });
+}
+```
+
+### 📍 Addım 3: AI Asistent Səhifəsində Sənəd Qoşulması (`AssistantPage.tsx`)
+Mesaj hissəsində sənədi string şəklində birləşdirməyin! Strukturlaşdırılmış `documentId` və ya `attachedDocument` obyekti göndərin:
+```typescript
+// src/services/chatService.ts
+export async function sendChatMessage(payload: {
+  message: string;
+  sessionId: string;
+  chatMode?: 'SMALL_CHAT' | 'LARGE_CHAT';
+  screenDestination?: string;
+  documentId?: string;
+  attachedDocument?: { fileName: string; text: string };
+}) {
+  return apiClient<any>('/chat/message', {
+    method: 'POST',
+    body: JSON.stringify({
+      chatMode: payload.chatMode || 'LARGE_CHAT',
+      screenDestination: payload.screenDestination || 'AI_SCREEN',
+      message: payload.message,
+      sessionId: payload.sessionId,
+      documentId: payload.documentId,
+      attachedDocument: payload.attachedDocument,
+    }),
+  });
+}
+```
+
+### 📍 Addım 4: Model Təliminin İşə Salınması (`AdminModelsPage.tsx`)
+FastAPI ML modelini təlim etmək üçün doğrudan AI URL-inə yox, Backend-dəki yeni proxy endpointinə müraciət edin:
+```typescript
+// src/services/adminService.ts
+export async function triggerModelTraining() {
+  return apiClient<{ success: boolean; message: string; job: any }>('/admin/models/train', {
+    method: 'POST',
+  });
+}
+```
