@@ -26,21 +26,29 @@ export async function getHistory(req: AuthenticatedRequest, res: Response) {
 }
 
 export async function sendMessage(req: AuthenticatedRequest, res: Response) {
-  const { chatMode, screenDestination, message, sessionId } = req.body as SendChatMessageRequest;
+  const { 
+    chatMode, 
+    screenDestination, 
+    message, 
+    sessionId,
+    documentId,
+    contextDocumentId,
+    attachedDocument
+  } = req.body as SendChatMessageRequest;
 
-  if (!message) {
-    throw new AppError('message parametri məcburidir', 400);
+  if (!message && !attachedDocument?.text) {
+    throw new AppError('message və ya attachedDocument məcburidir', 400);
   }
 
   const mode = chatMode || 'LARGE_CHAT';
   const dest = screenDestination || 'AI_SCREEN';
 
-  const systemPrompt = getSystemPromptFor(screenDestination);
+  const systemPrompt = getSystemPromptFor(dest, mode);
 
-  if (chatMode === ChatMode.SMALL_CHAT) {
-    const reply = await callLlmSmall(systemPrompt, message);
-    await logSmallChatMessage({ screenDestination, message, reply }); // fire-and-forget
-    const response: SmallChatMessage = { chatMode, text: reply };
+  if (mode === ChatMode.SMALL_CHAT) {
+    const reply = await callLlmSmall(systemPrompt, message || '');
+    await logSmallChatMessage({ screenDestination: dest, message: message || '', reply }); // fire-and-forget
+    const response: SmallChatMessage = { chatMode: mode, text: reply };
     return res.json(response);
   }
 
@@ -49,10 +57,11 @@ export async function sendMessage(req: AuthenticatedRequest, res: Response) {
     throw new AppError('LARGE_CHAT üçün sessionId məcburidir', 400);
   }
 
+  const docId = documentId || contextDocumentId;
   const history = await getChatHistory(sessionId, 10);
   const userId = req.user?.uid || 'dev-user-123';
-  const blocks = await callLlmLarge(systemPrompt, history, message, screenDestination, userId);
-  const reply: LargeChatMessage = await appendToHistory(sessionId, message, blocks);
+  const blocks = await callLlmLarge(systemPrompt, history, message || '', dest, userId, docId, attachedDocument);
+  const reply: LargeChatMessage = await appendToHistory(sessionId, message || (attachedDocument?.fileName ? `[Fayl əlavə edildi: ${attachedDocument.fileName}]` : ''), blocks);
   
   return res.json(reply);
 }

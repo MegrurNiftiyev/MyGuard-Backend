@@ -212,12 +212,20 @@ export const ScreenDestination = {
 } as const;
 export type ScreenDestination = typeof ScreenDestination[keyof typeof ScreenDestination] | string;
 
+export interface AttachedDocumentPayload {
+  fileName?: string;
+  text?: string;
+  fileSizeBytes?: number;
+}
+
 export interface SendChatMessageRequest {
   chatMode?: ChatMode;
   screenDestination?: ScreenDestination;
   message: string;
   sessionId?: string;
   contextDocumentId?: string;
+  documentId?: string;
+  attachedDocument?: AttachedDocumentPayload;
 }
 
 export interface SmallChatMessage {
