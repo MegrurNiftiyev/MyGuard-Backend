@@ -8,9 +8,9 @@ Frontend `mockData.ts`, "Yekun Vahid API Müqaviləsi" və backend-in real imple
 
 ## 📌 1. Baza Server Məlumatları və Canlı Linklər
 
-- **Canlı Backend Base URL (Production):** `https://myguard-backend-i4ll.onrender.com`
-- **İnteraktiv Swagger UI Sənədləşməsi:** `https://myguard-backend-i4ll.onrender.com/api-docs`
-- **Real-Time WebSocket (Socket.IO):** `https://myguard-backend-i4ll.onrender.com`
+- **Canlı Backend Base URL (Production):** `https://mygurad-backend-v2.onrender.com`
+- **İnteraktiv Swagger UI Sənədləşməsi:** `https://mygurad-backend-v2.onrender.com/api-docs`
+- **Real-Time WebSocket (Socket.IO):** `https://mygurad-backend-v2.onrender.com`
 - **Python FastAPI ML Microservice URL:** `https://myguard-ai-backend.onrender.com`
 - **Standart Sorğu Başlıqları (Headers):**
   ```http
@@ -83,7 +83,7 @@ type AiMessageBlock =
 ## 🔒 3. Autentifikasiya və İstifadəçi Sistemləri (`/api/auth` & `/api/users`)
 
 ### 🔹 3.1 `POST /api/auth/register` (Qeydiyyat)
-- **URL:** `https://myguard-backend-i4ll.onrender.com/api/auth/register`
+- **URL:** `https://mygurad-backend-v2.onrender.com/api/auth/register`
 - **Method:** `POST`
 - **Request Body (JSON):**
 ```json
@@ -115,7 +115,7 @@ type AiMessageBlock =
 ```
 
 ### 🔹 3.2 `POST /api/auth/login` (Daxil ol)
-- **URL:** `https://myguard-backend-i4ll.onrender.com/api/auth/login`
+- **URL:** `https://mygurad-backend-v2.onrender.com/api/auth/login`
 - **Request Body (JSON):**
 ```json
 {
@@ -148,7 +148,8 @@ type AiMessageBlock =
 ### 🔹 4.1 `POST /api/documents/upload` (Sənəd Yükləmək)
 - **Content-Type:** `multipart/form-data`
 - **Form Data Key:** `document` (File)
-- **Header:** `Accept-Language: az` | `en` | `ru` | `tr`
+- **Form Data Key:** `isConfidential` (boolean, optional) - Əgər `true` olarsa, sənəd LLM (Süni İntellekt) analizindən kənarda tutulur və yalnız yerli analizlər (OCR, ML) aparılır. Məxfi sənədlər üçün istifadə edin.
+- **Header:** `Accept-Language: az | en | ru | tr` (Bütün API endpoint-ləri bu header əsasında lokallaşdırılmış cavablar qaytarır. Standart: `az`)
 - **Response (200 OK):**
 ```json
 {
@@ -292,7 +293,7 @@ type AiMessageBlock =
 ```typescript
 import { io } from 'socket.io-client';
 
-const socket = io('https://myguard-backend-i4ll.onrender.com', {
+const socket = io('https://mygurad-backend-v2.onrender.com', {
   transports: ['websocket', 'polling']
 });
 
@@ -356,7 +357,7 @@ socket.on('scan_event', (data) => {
 ## 💻 7. Standard Frontend API Service (`apiClient.ts`)
 
 ```typescript
-const BASE_URL = 'https://myguard-backend-i4ll.onrender.com/api';
+const BASE_URL = 'https://mygurad-backend-v2.onrender.com/api';
 
 export async function apiClient<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('access_token');

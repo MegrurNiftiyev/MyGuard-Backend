@@ -54,7 +54,8 @@ export interface Document {
     hiddenTextDetected: boolean;
     extraTextSegments: string[];
     textDifferenceFound: boolean;
-    differenceSnippet: string;
+    differenceSnippet: string; // for backward compatibility
+    differenceSnippets: string[]; // new list format
     ocrText: string;
     pdfTextLayer: string;
     status: 'clean' | 'suspicious';
@@ -294,6 +295,7 @@ export interface DocumentThreatReport {
   threats: ThreatItem[];
   ocrText?: string;
   pdfTextLayer?: string;
-  flaggedSnippet?: string;
+  flaggedSnippet?: string; // legacy
+  flaggedSnippets?: string[]; // new list format
   flaggedMetadata?: any;
 }
