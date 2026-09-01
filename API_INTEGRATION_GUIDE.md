@@ -63,8 +63,12 @@ type AiMessageBlock =
 ### ✅ Konflikt 4 — Security Interventions Birləşməsi
 - Ayrıca `/interventions` saxlanılmır. `GET /api/security/actions` endpoint-i `decision: 'ALLOWED' | 'BLOCKED'` parametrinə görə filtrlənir.
 
-### ✅ Konflikt 5 — `POST /api/admin/models` Bərpası
-- Model təlimi və versiya registry-si üçün `POST /api/admin/models` bərpa olundu.
+### ✅ Konflikt 5 — `POST /api/admin/models` və `POST /api/admin/models/train` Bərpası
+- Model versiya registry-si üçün `POST /api/admin/models` bərpa olundu.
+- Python FastAPI ML microservice-də modeli təlimə göndərmək üçün **`POST /api/admin/models/train`** endpoint-i əlavə edildi. Backend daxili `X-Internal-Token` göndərərək təlim prosesini başladır:
+  - **Endpoint:** `POST /api/admin/models/train`
+  - **Header:** `Authorization: Bearer <Token>`
+  - **Response (200 OK):** `{ "success": true, "message": "Model təlimi uğurla başladıldı.", "job": { "job_id": "...", "status": "started" } }`
 
 ### ✅ Konflikt 6 — `layer3_llmReview` Tip Genişlənməsi
 - `layer3_llmReview` obyektinə `isMalicious: boolean` və `confidence: number` sahələri əlavə edildi.

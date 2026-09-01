@@ -32,22 +32,15 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
 
     let normalizedOcrText = '';
     try {
-      let images: Buffer[] = [];
-      try {
-        const { convert } = await import('pdf-img-convert');
-        const converted = await convert(pdfBuffer, { scale: 2 });
-        images = converted.map((img: any) => Buffer.from(img));
-      } catch (pdfImgErr) {
-        console.log('[Layer 1] pdf-img-convert canvas fallback -> using @napi-rs/canvas rendering...');
-        const { createCanvas } = await import('@napi-rs/canvas');
-        for (let i = 1; i <= numPages; i++) {
-          const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 2 });
-          const canvas = createCanvas(viewport.width, viewport.height);
-          const ctx = canvas.getContext('2d');
-          await page.render({ canvasContext: ctx as any, canvas: canvas as any, viewport }).promise;
-          images.push(canvas.toBuffer('image/png'));
-        }
+      const images: Buffer[] = [];
+      const { createCanvas } = await import('@napi-rs/canvas');
+      for (let i = 1; i <= numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = createCanvas(viewport.width, viewport.height);
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx as any, canvas: canvas as any, viewport }).promise;
+        images.push(canvas.toBuffer('image/png'));
       }
 
       let fullOcrText = '';
