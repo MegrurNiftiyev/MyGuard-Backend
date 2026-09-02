@@ -1,8 +1,11 @@
+import path from 'path';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import Tesseract from 'tesseract.js';
 import stringSimilarity from 'string-similarity';
 import { diffWords } from 'diff';
 import { env } from '../../config/env.js';
+
+const tessdataPath = path.join(process.cwd(), 'tessdata');
 
 function normalizeText(text: string): string {
   return text
@@ -65,7 +68,7 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
           if (!response.ok) {
             const errText = await response.text();
             console.warn(`[Layer 1] Google Vision API Xətası: ${errText}. Tesseract-a keçilir...`);
-            const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng');
+            const { data: { text } } = await Tesseract.recognize(images[i], 'eng', { langPath: tessdataPath });
             fullOcrText += text + ' ';
           } else {
             const data = await response.json();
@@ -74,9 +77,9 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
           }
         }
       } else {
-        console.log(`[Layer 1] GOOGLE_VISION_API_KEY tapılmadı, Tesseract (aze+eng) istifadə edilir...`);
+        console.log(`[Layer 1] GOOGLE_VISION_API_KEY tapılmadı, Tesseract (eng) istifadə edilir...`);
         for (let i = 0; i < images.length; i++) {
-          const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng');
+          const { data: { text } } = await Tesseract.recognize(images[i], 'eng', { langPath: tessdataPath });
           fullOcrText += text + ' ';
         }
       }

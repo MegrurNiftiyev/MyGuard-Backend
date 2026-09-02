@@ -3,8 +3,8 @@ import { env } from '../../config/env.js';
 export interface ClassifyRequestPayload {
   documentId: string;
   text: string;
-  ocrText?: string | null;
-  hiddenText?: string | null;
+  ocrText?: string | string[] | null;
+  hiddenText?: string | string[] | null;
   language?: string;
 }
 
