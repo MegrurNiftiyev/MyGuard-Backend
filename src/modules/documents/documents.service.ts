@@ -337,8 +337,69 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
 
   await sleep(1000);
   
-  const overallRiskScore = layer1Result.isSystemError ? 0 : (layer1Result.hiddenTextDetected ? 92 : isInjection ? 85 : 12);
-  const status: RiskStatus = layer1Result.isSystemError ? 'safe' : (overallRiskScore > 80 ? 'high_risk' : overallRiskScore > 30 ? 'suspicious' : 'safe');
+  // Calculate Dynamic 3-Factor Weighted Composite Risk Score
+  let overallRiskScore = 0;
+
+  if (layer1Result.isSystemError) {
+    overallRiskScore = 0;
+  } else {
+    // Factor 1: Layer 1 OCR vs PDF Text Discrepancy & Hidden Text Score (0-100)
+    const matchPct = layer1Result.matchPercent ?? 100;
+    let l1Score = 100 - matchPct; // Mismatch percent
+    if (layer1Result.hiddenTextDetected) {
+      const extraCount = layer1Result.extraTextSegments?.length || 1;
+      l1Score = Math.max(l1Score, 75 + Math.min(extraCount * 5, 20)); // Base 75-95 if hidden text is detected
+    }
+
+    // Factor 2: Layer 2 RETVec + CNN ML Classifier Score (0-100)
+    let l2Score = 0;
+    if (layer2Result && fastApiResult) {
+      if (layer2Result.isInjection) {
+        l2Score = Math.round(layer2Result.confidence * 100);
+      } else if (layer2Result.classification === 'Suspicious') {
+        l2Score = Math.round(layer2Result.confidence * 70);
+      } else {
+        l2Score = Math.round((1 - layer2Result.confidence) * 20);
+      }
+    } else {
+      // Fallback if FastAPI ML microservice was offline
+      l2Score = l1Score;
+    }
+
+    // Factor 3: Layer 3 Contextual LLM Security Review Score (0-100)
+    let l3Score = 0;
+    if (isConfidential) {
+      l3Score = 0; // Layer 3 bypassed for confidential docs
+    } else if (layer3Result) {
+      if (layer3Result.isMalicious) {
+        l3Score = Math.round((layer3Result.confidence || 0.95) * 100);
+      } else {
+        l3Score = Math.round((1 - (layer3Result.confidence || 0.95)) * 20);
+      }
+    }
+
+    // Combine 3 Factors with Weights
+    if (isConfidential) {
+      overallRiskScore = Math.round(l1Score * 0.5 + l2Score * 0.5);
+    } else if (!fastApiResult) {
+      // If Layer 2 was offline
+      overallRiskScore = Math.round(l1Score * 0.4 + l3Score * 0.6);
+    } else {
+      // All 3 Layers Active: 30% Layer 1, 35% Layer 2, 35% Layer 3
+      overallRiskScore = Math.round(l1Score * 0.30 + l2Score * 0.35 + l3Score * 0.35);
+    }
+
+    // Absolute Threat Override Floor:
+    // If any layer strongly identifies an active prompt injection threat, ensure high risk score (at least 85)
+    if (layer3Result?.isMalicious || isInjection || (layer1Result.hiddenTextDetected && matchPct < 90)) {
+      overallRiskScore = Math.max(overallRiskScore, 85);
+    }
+
+    // Bound score between 0 and 100
+    overallRiskScore = Math.min(100, Math.max(0, overallRiskScore));
+  }
+
+  const status: RiskStatus = layer1Result.isSystemError ? 'safe' : (overallRiskScore >= 80 ? 'high_risk' : overallRiskScore >= 35 ? 'suspicious' : 'safe');
 
 
   await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { 
