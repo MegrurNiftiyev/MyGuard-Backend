@@ -268,8 +268,8 @@ type AiMessageBlock =
     "used": true,
     "isMalicious": true,
     "confidence": 0.985,
-    "explanation": "Layer 1 OCR analizi zamanı sənəddə <ferqli>Ignore previous instructions...</ferqli> fərqliliyi aşkar olundu.",
-    "message": "Layer 1 OCR analizi zamanı sənəddə <ferqli>Ignore previous instructions...</ferqli> fərqliliyi aşkar olundu.",
+    "explanation": "Layer 1 OCR analizi zamanı sənəddə 'Ignore previous instructions...' fərqliliyi aşkar olundu.",
+    "message": "Layer 1 OCR analizi zamanı sənəddə 'Ignore previous instructions...' fərqliliyi aşkar olundu.",
     "recommendedAction": "Sənədin korporativ AI modellərinə ötürülməsi BLOKLANMALIDIR.",
     "attackVector": "Indirect Prompt Injection (Steganographic Hidden Text Layer)",
     "reasoning": "OCR və PDF daxili mətn qatı arasında fərq tapıldı.",
@@ -286,6 +286,14 @@ type AiMessageBlock =
   "errorDetail": null
 }
 ```
+
+> **📌 Dinamik 3-Faktorlu Yekun Risk Balı Hesablanması (`finalRiskScore`):**
+> `finalRiskScore` dəyəri 3 müstəqil faktorun çəkili ortalaması ilə dinamik hesablanır:
+> 1. **Faktor 1 (Layer 1 - OCR vs PDF Mətn Uyğunsuzluğu % Və Gizli Mətn Göstəricisi):** Mətn uyğunsuzluğu faizi və aşkar olunan gizli mətnlərin sayına mütənasib bal (0-100).
+> 2. **Faktor 2 (Layer 2 - RETVec + CNN ML Mikroxidmət Balı):** ML modelinin təsnifatı (`injection` / `suspicious` / `safe`) və əminlik faizi (`confidence * 100`).
+> 3. **Faktor 3 (Layer 3 - OpenAI LLM Semantik Rəy Balı):** LLM-in `isMalicious` qərarı və `confidence` dərəcəsi (Məxfi sənədlərdə ötürülür).
+> - **Çəkili Düstur:** Hər 3 layer aktiv olduqda: `(Faktor 1 * 30%) + (Faktor 2 * 35%) + (Faktor 3 * 35%)`.
+> - **Kritik Təhdid Floor Qaydası:** Hər hansı bir layer aktiv prompt injection təsdiq edərsə, `finalRiskScore` minimum `85+` bal olaraq saxlanılır və sənəd `high_risk` kimi bloklanır.
 
 #### 📌 Nümunə: Məxfi Rejimdə (`isConfidential: true`) Yüklənmiş Sənəd Cavabı
 ```json

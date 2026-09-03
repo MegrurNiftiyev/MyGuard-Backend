@@ -73,13 +73,21 @@ Every document uploaded to the API passes through a synchronized, 7-stage automa
                                  ▼
   ┌─────────────────────────────────────────────────────────────┐
   │ Layer 3: Contextual LLM Security Review (OpenAI gpt-4o-mini) │
-  │  - Deep semantic risk valuation of <ferqli> text tags        │
+  │  - Deep semantic risk valuation of extracted text segments    │
   │  - Attack vector taxonomy & plain-language mitigation steps │
   └──────────────────────────────┬──────────────────────────────┘
                                  │
                                  ▼
 [ Final Risk Assessment & Decision: ALLOWED / SANITIZED / BLOCKED ]
 ```
+
+### 🧮 Dynamic 3-Factor Weighted Composite Risk Score Algorithm:
+The `finalRiskScore` (0-100) is dynamically computed by weighting metrics across all 3 independent security layers:
+- **Factor 1 (Layer 1 OCR Mismatch & Hidden Text Score):** `(100 - matchPercent)` boosted to 75-95 if zero-opacity hidden text is detected.
+- **Factor 2 (Layer 2 RETVec + CNN ML Classifier Score):** `confidence * 100` based on classification (`injection`, `suspicious`, `safe`).
+- **Factor 3 (Layer 3 Contextual LLM Review Score):** `confidence * 100` if `isMalicious === true` (bypassed for `isConfidential` documents).
+- **Weighted Formula:** `(Factor 1 * 30%) + (Factor 2 * 35%) + (Factor 3 * 35%)`.
+- **Threat Floor Override:** Any layer identifying a confirmed active prompt injection enforces a minimum score floor of `85+` (`high_risk`).
 
 ### Pipeline Steps History Sequence:
 1. `DOCUMENT_UPLOADED`: Secure sandbox file receipt & metadata validation.
