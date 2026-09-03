@@ -57,7 +57,11 @@ export async function getChatHistory(sessionId: string, limitCount: number = 10)
       const messages: LargeChatMessage[] = [];
       snapshot.forEach((doc: any) => messages.push(doc.data() as LargeChatMessage));
       if (messages.length > 0) {
-        messages.sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+        messages.sort((a, b) => {
+          const timeA = a.createdAtISO ? new Date(a.createdAtISO).getTime() : (a.id ? parseInt(a.id.replace(/\D/g, '')) || 0 : 0);
+          const timeB = b.createdAtISO ? new Date(b.createdAtISO).getTime() : (b.id ? parseInt(b.id.replace(/\D/g, '')) || 0 : 0);
+          return timeA - timeB;
+        });
         return messages.slice(-limitCount);
       }
     } catch (err) {
@@ -374,6 +378,7 @@ Do NOT use Markdown outside of text blocks. Only return a valid JSON object matc
 
 export async function appendToHistory(sessionId: string, userMessageText: string, blocks: MessageBlock[]): Promise<LargeChatMessage> {
   const now = new Date().toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' });
+  const isoNow = new Date().toISOString();
   const userMsgId = 'msg-' + Date.now();
   const assistantMsgId = 'msg-' + (Date.now() + 1);
 
@@ -381,6 +386,7 @@ export async function appendToHistory(sessionId: string, userMessageText: string
     id: userMsgId,
     sender: 'user',
     timestamp: now,
+    createdAtISO: isoNow,
     blocks: [{ type: 'text', content: userMessageText }],
   };
 
@@ -388,6 +394,7 @@ export async function appendToHistory(sessionId: string, userMessageText: string
     id: assistantMsgId,
     sender: 'assistant',
     timestamp: now,
+    createdAtISO: isoNow,
     blocks,
   };
 

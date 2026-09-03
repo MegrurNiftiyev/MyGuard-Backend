@@ -244,6 +244,7 @@ export interface LargeChatMessage {
   id: string;
   sender: 'assistant' | 'user';
   timestamp: string;
+  createdAtISO?: string;
   blocks: MessageBlock[];
 }
 
