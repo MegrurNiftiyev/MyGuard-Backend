@@ -11,6 +11,7 @@ import { getSystemPromptFor } from './prompts.js';
 import { env } from '../../config/env.js';
 import { getRiskSummaryReport } from '../reports/reports.service.js';
 import { getDocumentById } from '../documents/documents.service.js';
+import { classifyDocumentText } from '../analysis/fastapi.service.js';
 
 export interface ChatSession {
   id: string;
@@ -179,18 +180,53 @@ ${doc.layer1_ocrTextMatch?.ocrText || 'Document text content.'}
   }
 
   if (activeFiles.length > 0) {
-    docContextPrompt += `\n[ATTACHED USER DOCUMENTS FOR SECURITY SCAN (${activeFiles.length} File(s))]\n`;
+    docContextPrompt += `\n[ATTACHED USER DOCUMENTS FOR LIVE SECURITY SCAN VIA FASTAPI ML MODEL (${activeFiles.length} File(s))]\n`;
     for (let i = 0; i < activeFiles.length; i++) {
       const f = activeFiles[i];
       const fileName = f.name || f.fileName || `attached_file_${i + 1}.txt`;
       const rawText = f.content || f.text || '';
-      const hasInjectionPattern = /ignore\s+previous\s+instructions|system\s+directive|override|you\s+must\s+rank/i.test(rawText);
-      const riskScore = hasInjectionPattern ? 88 : 12;
+      
+      // Real-time classification call to Python FastAPI ML Microservice (RETVec + CNN Model)
+      const fastApiResult = await classifyDocumentText({
+        documentId: `chat-file-${Date.now()}-${i}`,
+        fullText: rawText || fileName,
+      });
+
+      let maliciousProbability = 0;
+      let securityVerdict = 'SAFE / CLEAN (Təhlükəsiz)';
+      let categoriesStr = 'Yoxdur';
+      let confidenceVal = 0.99;
+
+      if (fastApiResult) {
+        confidenceVal = fastApiResult.confidence;
+        if (fastApiResult.label === 'injection') {
+          maliciousProbability = Math.round(fastApiResult.confidence * 100);
+          securityVerdict = 'HIGH RISK / PROMPT INJECTION DETECTED (Zərərli)';
+        } else if (fastApiResult.label === 'suspicious') {
+          maliciousProbability = Math.round(fastApiResult.confidence * 100);
+          securityVerdict = 'SUSPICIOUS / POTENTIAL THREAT (Şübhəli)';
+        } else {
+          maliciousProbability = Math.round((1 - fastApiResult.confidence) * 100);
+          securityVerdict = 'SAFE / CLEAN (Təhlükəsiz)';
+        }
+        if (fastApiResult.categories && fastApiResult.categories.length > 0) {
+          categoriesStr = fastApiResult.categories.join(', ');
+        }
+      } else {
+        // Fallback pre-scan if FastAPI microservice is offline
+        const hasInjectionPattern = /ignore\s+previous\s+instructions|system\s+directive|override|you\s+must\s+rank/i.test(rawText);
+        maliciousProbability = hasInjectionPattern ? 88 : 10;
+        securityVerdict = hasInjectionPattern ? 'SUSPICIOUS / INJECTION PATTERNS DETECTED (Şübhəli - Pre-Scan Fallback)' : 'SAFE / CLEAN (Pre-Scan Baseline)';
+      }
 
       docContextPrompt += `
---- FILE ${i + 1}: "${fileName}" ---
-- Pre-Scan Security Status: ${hasInjectionPattern ? 'SUSPICIOUS / PROMPT INJECTION PATTERNS DETECTED' : 'CLEAN / NO OBVIOUS OVERRIDES'}
-- Dynamic Risk Score Assessment: ${riskScore}/100
+--- FAYL ${i + 1}: "${fileName}" ---
+- Fayl Adı (File Name): ${fileName}
+- Python FastAPI ML (RETVec + CNN Model) Analiz Kararı: ${securityVerdict}
+- Zərərli Olma Ehtimalı (Malicious Probability %): ${maliciousProbability}%
+- Model Əminlik Faizi (Confidence): ${(confidenceVal * 100).toFixed(1)}%
+- Aşkar Olunan Kateqoriyalar: ${categoriesStr}
+- Faylın Daxili Mətni (Content):
 <untrusted_document_context filename="${fileName}">
 ${rawText}
 </untrusted_document_context>

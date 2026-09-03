@@ -405,7 +405,7 @@ socket.on('scan_event', (data) => {
 > 1. Əgər sənəd artıq sistemdə skan olunubsa, yalnız `documentId` göndərmək kifayətdir. Backend MyGuard-ın rəsmi 3-layer təhlükəsizlik nəticələrini LLM-ə konfigürasiya kimi ötürəcək.
 > 2. Əgər Web Frontend-dən yoxlanılmamış bir və ya bir neçə fayl mətni doğrudan qoşulursa, **`files: [{ name, content }]`** massivini göndərin (köhnə `attachedDocument: { fileName, text }` sahəsi də geriyə uyğunluq üçün dəstəklənir).
 > 3. Sorğuda mesaj mətni üçün `message` və ya `userMessage` istifadə oluna bilər.
-> 4. Qoşulmuş faylların təhlükəsizlik statusu və dinamik risk balı (məsələn, 88/100 risk) backend arxa planında avtomatik analiz olunaraq AI kontekstinə ötürülür.
+> 4. Qoşulmuş hər bir fayl mətni dərhal Python FastAPI ML mikroxidmətinə (`/classify` - RETVec + CNN Model) canlı sorğu ilə göndərilir. AI Asistent həmin modelin verdiyi **Zərərli Olma Ehtimalı Faizini (Malicious Probability %)**, Fayl Adını və Daxili Məzmununu strukturlaşdırılmış siyahı şəklində istifadəçiyə detalı ilə izah edir.
 - **Response (200 OK):**
 ```json
 {
