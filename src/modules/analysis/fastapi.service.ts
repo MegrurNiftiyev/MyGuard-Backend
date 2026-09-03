@@ -2,10 +2,7 @@ import { env } from '../../config/env.js';
 
 export interface ClassifyRequestPayload {
   documentId: string;
-  text: string;
-  ocrText?: string | string[] | null;
-  hiddenText?: string | string[] | null;
-  language?: string;
+  fullText: string;
 }
 
 export interface ClassifyResponseData {
@@ -49,14 +46,10 @@ export async function classifyDocumentText(
         headers: {
           'Content-Type': 'application/json',
           'X-Internal-Token': env.INTERNAL_SERVICE_TOKEN,
-          'Accept-Language': payload.language || 'az',
         },
         body: JSON.stringify({
           documentId: payload.documentId,
-          text: payload.text || 'Empty document text',
-          ocrText: payload.ocrText || null,
-          hiddenText: payload.hiddenText || null,
-          language: payload.language || 'en',
+          fullText: payload.fullText || '',
         }),
         signal: controller.signal,
       });

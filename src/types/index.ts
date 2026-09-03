@@ -33,6 +33,7 @@ export interface Document {
   fileSizeBytes: number;
   fileType: 'pdf' | 'docx' | 'txt' | string;
   uploadUrl: string;
+  isConfidential: boolean;
 
   uploadedAt: string;
   scanStartedAt: string | null;
@@ -99,6 +100,7 @@ export interface DocumentListItem {
   finalStatus: 'safe' | 'suspicious' | 'high_risk' | null;
   finalRiskScore: number | null;
   currentStep: ScanStep | 'COMPLETED' | 'FAILED';
+  isConfidential?: boolean;
 }
 
 export interface ScanSocketEvent {
@@ -110,6 +112,7 @@ export interface ScanSocketEvent {
     | 'layer1_ocrTextMatch' | 'layer2_classification' | 'layer3_llmReview'
     | 'finalRiskScore' | 'finalStatus' | 'isContainInjection'
     | 'scanStartedAt' | 'scanFinishedAt' | 'scanDurationMs'
+    | 'isConfidential'
   >;
 }
 
@@ -213,7 +216,9 @@ export const ScreenDestination = {
 export type ScreenDestination = typeof ScreenDestination[keyof typeof ScreenDestination] | string;
 
 export interface AttachedDocumentPayload {
+  name?: string;
   fileName?: string;
+  content?: string;
   text?: string;
   fileSizeBytes?: number;
 }
@@ -221,11 +226,13 @@ export interface AttachedDocumentPayload {
 export interface SendChatMessageRequest {
   chatMode?: ChatMode;
   screenDestination?: ScreenDestination;
-  message: string;
+  message?: string;
+  userMessage?: string;
   sessionId?: string;
   contextDocumentId?: string;
   documentId?: string;
   attachedDocument?: AttachedDocumentPayload;
+  files?: AttachedDocumentPayload[];
 }
 
 export interface SmallChatMessage {

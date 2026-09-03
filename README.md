@@ -153,6 +153,7 @@ interface DocumentRecord {
   fileSizeBytes: number;
   fileType: 'pdf' | 'docx' | 'png' | 'jpg' | 'txt';
   uploadUrl: string;
+  isConfidential: boolean;
   uploadedAt: string;
   scanStartedAt?: string;
   scanFinishedAt?: string;

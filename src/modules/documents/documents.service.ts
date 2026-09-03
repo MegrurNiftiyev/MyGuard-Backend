@@ -25,6 +25,7 @@ function pickSocketFields(doc: Document): ScanSocketEvent['fileData'] {
     scanStartedAt: doc.scanStartedAt,
     scanFinishedAt: doc.scanFinishedAt,
     scanDurationMs: doc.scanDurationMs,
+    isConfidential: doc.isConfidential ?? false,
   };
 }
 
@@ -125,6 +126,7 @@ export async function processAndSaveDocument(
     fileSizeBytes: fileBuffer.length,
     fileType: fileExtension,
     uploadUrl: fileUrl,
+    isConfidential: Boolean(isConfidential),
     uploadedAt: nowISO,
     scanStartedAt: null,
     scanFinishedAt: null,
@@ -241,10 +243,7 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
 
   const fastApiResult = await classifyDocumentText({
     documentId: docId,
-    text: layer1Result.pdfTextLayer || filename,
-    ocrText: layer1Result.ocrText || null,
-    hiddenText: layer1Result.extraTextSegments?.[0] || null,
-    language: lang,
+    fullText: layer1Result.pdfTextLayer || filename,
   });
 
   let layer2Result: Layer2ClassifierResult | null = null;
@@ -382,6 +381,7 @@ export async function getUserDocuments(userId: string): Promise<DocumentListItem
     finalStatus: d.finalStatus,
     finalRiskScore: d.finalRiskScore,
     currentStep: d.currentStep,
+    isConfidential: d.isConfidential ?? false,
   }));
 }
 
@@ -426,6 +426,7 @@ function createDemoFallbackDocument(docId: string, lang: SupportedLanguage = 'az
       fileSizeBytes: 3335,
       fileType: 'pdf',
       uploadUrl: `https://storage.googleapis.com/mygurad.firebasestorage.app/documents/${docId}.pdf`,
+      isConfidential: false,
       uploadedAt: new Date().toISOString(),
       scanStartedAt: new Date().toISOString(),
       scanFinishedAt: new Date().toISOString(),
@@ -495,6 +496,7 @@ function createDemoFallbackDocument(docId: string, lang: SupportedLanguage = 'az
     fileSizeBytes: 45800,
     fileType: 'pdf',
     uploadUrl: `/uploads/${docId}.pdf`,
+    isConfidential: false,
     uploadedAt: new Date().toISOString(),
     scanStartedAt: new Date().toISOString(),
     scanFinishedAt: new Date().toISOString(),
@@ -564,6 +566,7 @@ function createMockHighRiskDocument(lang: SupportedLanguage = 'az'): Document {
     fileSizeBytes: 125000,
     fileType: 'pdf',
     uploadUrl: '/uploads/mock/cv_john_doe.pdf',
+    isConfidential: false,
     uploadedAt: new Date().toISOString(),
     scanStartedAt: new Date().toISOString(),
     scanFinishedAt: new Date().toISOString(),

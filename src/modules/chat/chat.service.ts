@@ -146,7 +146,8 @@ export async function callLlmLarge(
   screenDestination?: string, 
   userId: string = 'dev-user-123',
   docId?: string,
-  attachedDocument?: AttachedDocumentPayload
+  attachedDocument?: AttachedDocumentPayload,
+  filesList?: AttachedDocumentPayload[]
 ): Promise<MessageBlock[]> {
   let docContextPrompt = '';
   if (docId) {
@@ -167,18 +168,34 @@ ${doc.layer1_ocrTextMatch?.ocrText || 'Document text content.'}
 </untrusted_document_context>
 `;
     }
-  } else if (attachedDocument?.text) {
-    const fileName = attachedDocument.fileName || 'attached_document.txt';
-    const rawText = attachedDocument.text;
-    const hasInjectionPattern = /ignore\s+previous\s+instructions|system\s+directive|override|you\s+must\s+rank/i.test(rawText);
-    
-    docContextPrompt = `\n
-[ATTACHED UNCHECKED DOCUMENT: "${fileName}"]
-- Security Pre-Scan Verdict: ${hasInjectionPattern ? 'SUSPICIOUS / INJECTION PATTERNS DETECTED' : 'CLEAN / NO OBVIOUS OVERRIDES'}
+  }
+
+  // Handle files list or single attached document
+  const activeFiles: AttachedDocumentPayload[] = [];
+  if (filesList && filesList.length > 0) {
+    activeFiles.push(...filesList);
+  } else if (attachedDocument) {
+    activeFiles.push(attachedDocument);
+  }
+
+  if (activeFiles.length > 0) {
+    docContextPrompt += `\n[ATTACHED USER DOCUMENTS FOR SECURITY SCAN (${activeFiles.length} File(s))]\n`;
+    for (let i = 0; i < activeFiles.length; i++) {
+      const f = activeFiles[i];
+      const fileName = f.name || f.fileName || `attached_file_${i + 1}.txt`;
+      const rawText = f.content || f.text || '';
+      const hasInjectionPattern = /ignore\s+previous\s+instructions|system\s+directive|override|you\s+must\s+rank/i.test(rawText);
+      const riskScore = hasInjectionPattern ? 88 : 12;
+
+      docContextPrompt += `
+--- FILE ${i + 1}: "${fileName}" ---
+- Pre-Scan Security Status: ${hasInjectionPattern ? 'SUSPICIOUS / PROMPT INJECTION PATTERNS DETECTED' : 'CLEAN / NO OBVIOUS OVERRIDES'}
+- Dynamic Risk Score Assessment: ${riskScore}/100
 <untrusted_document_context filename="${fileName}">
 ${rawText}
 </untrusted_document_context>
 `;
+    }
   }
 
   const tools = [
