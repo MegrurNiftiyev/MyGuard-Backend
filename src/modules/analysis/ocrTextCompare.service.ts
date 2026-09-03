@@ -33,6 +33,7 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
     const normalizedPdfText = normalizeText(fullPdfText);
     console.log('[Layer 1] PDF text-layer çıxarıldı, uzunluq:', normalizedPdfText.length);
 
+    let fullOcrText = '';
     let normalizedOcrText = '';
     try {
       const images: Buffer[] = [];
@@ -46,7 +47,6 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
         images.push(canvas.toBuffer('image/png'));
       }
 
-      let fullOcrText = '';
       if (env.GOOGLE_VISION_API_KEY) {
         console.log(`[Layer 1] Google Cloud Vision API istifadə edilir (${images.length} səhifə)...`);
         for (let i = 0; i < images.length; i++) {
@@ -94,30 +94,59 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
       normalizedOcrText = normalizeText(fullOcrText);
     } catch (canvasErr: any) {
       console.warn('[Layer 1] Canvas rendering or OCR error. Using text-layer fallback:', canvasErr?.message);
+      fullOcrText = fullPdfText;
       normalizedOcrText = normalizedPdfText;
     }
+
+    const rawPdfText = fullPdfText.replace(/\s+/g, ' ').trim();
+    const rawOcrText = (fullOcrText || normalizedOcrText).replace(/\s+/g, ' ').trim();
 
     const matchFraction = stringSimilarity.compareTwoStrings(normalizedPdfText, normalizedOcrText);
     const matchPercent = Math.round(matchFraction * 100);
 
-    const diffs = diffWords(normalizedOcrText, normalizedPdfText);
     const extraTextSegments: string[] = [];
 
-    for (const part of diffs) {
-      if (part.added && part.value.trim().length > 5) {
-        extraTextSegments.push(part.value.trim());
+    // Split PDF text into logical segments to isolate precise hidden text/prompts
+    const segments = rawPdfText
+      .split(/(?<=[.!?\n\r])|(?=\*\*\*)|(?<=\*\*\*)/)
+      .map(s => s.trim())
+      .filter(s => s.length > 8);
+
+    for (const seg of segments) {
+      const normSeg = normalizeText(seg);
+      // Check if segment exists anywhere in visual OCR text
+      const existsInOcr = normalizedOcrText.includes(normSeg) || 
+                          stringSimilarity.compareTwoStrings(normSeg, normalizedOcrText) > 0.4;
+      
+      if (!existsInOcr) {
+        if (!extraTextSegments.some(existing => existing.includes(seg) || seg.includes(existing))) {
+          extraTextSegments.push(seg);
+        }
+      }
+    }
+
+    // Fallback if sentence-based parsing missed something but matchPercent is low
+    if (extraTextSegments.length === 0 && matchPercent < 90) {
+      const diffs = diffWords(normalizedOcrText, normalizedPdfText);
+      for (const part of diffs) {
+        if (part.added && part.value.trim().length > 10) {
+          const val = part.value.trim();
+          if (!extraTextSegments.includes(val)) {
+            extraTextSegments.push(val);
+          }
+        }
       }
     }
 
     const hiddenTextDetected = matchPercent < 90 || extraTextSegments.length > 0;
-    console.log(`[Layer 1] Nəticə: Uyğunluq ${matchPercent}%. Gizli mətn blokları:`, extraTextSegments.length);
+    console.log(`[Layer 1] Nəticə: Uyğunluq ${matchPercent}%. Dəqiq gizli mətn blokları:`, extraTextSegments.length);
 
     return {
       matchPercent,
       hiddenTextDetected,
       extraTextSegments: extraTextSegments.length > 0 ? extraTextSegments : undefined,
-      ocrText: normalizedOcrText || fullPdfText || 'OCR mətni oxundu',
-      pdfTextLayer: normalizedPdfText || fullPdfText || 'PDF mətn qatı oxundu',
+      ocrText: rawOcrText || 'OCR mətni oxundu',
+      pdfTextLayer: rawPdfText || 'PDF mətn qatı oxundu',
     };
   } catch (error) {
     console.warn('[Layer 1] PDF extraction error, returning safe baseline:', error);
