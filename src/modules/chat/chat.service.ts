@@ -52,13 +52,14 @@ export async function getChatHistory(sessionId: string, limitCount: number = 10)
       const snapshot = await db
         .collection(COLLECTIONS.CHAT_MESSAGES)
         .where('sessionId', '==', sessionId)
-        .orderBy('timestamp', 'desc')
-        .limit(limitCount)
         .get();
 
       const messages: LargeChatMessage[] = [];
       snapshot.forEach((doc: any) => messages.push(doc.data() as LargeChatMessage));
-      if (messages.length > 0) return messages.reverse(); // desc for limit, then reverse to chronological
+      if (messages.length > 0) {
+        messages.sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+        return messages.slice(-limitCount);
+      }
     } catch (err) {
       console.warn('[Chat Service] Firestore get messages fallback:', err);
     }

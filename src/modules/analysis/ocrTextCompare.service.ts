@@ -68,8 +68,12 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
           if (!response.ok) {
             const errText = await response.text();
             console.warn(`[Layer 1] Google Vision API Xətası: ${errText}. Tesseract-a keçilir...`);
-            const { data: { text } } = await Tesseract.recognize(images[i], 'eng', { langPath: tessdataPath });
-            fullOcrText += text + ' ';
+            try {
+              const { data: { text } } = await Tesseract.recognize(images[i], 'eng', { langPath: tessdataPath });
+              fullOcrText += text + ' ';
+            } catch (tessErr: any) {
+              console.warn(`[Layer 1] Tesseract OCR xətası (səhifə ${i + 1}): ${tessErr?.message || tessErr}`);
+            }
           } else {
             const data = await response.json();
             const text = data.responses[0]?.fullTextAnnotation?.text || '';
@@ -79,8 +83,12 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
       } else {
         console.log(`[Layer 1] GOOGLE_VISION_API_KEY tapılmadı, Tesseract (eng) istifadə edilir...`);
         for (let i = 0; i < images.length; i++) {
-          const { data: { text } } = await Tesseract.recognize(images[i], 'eng', { langPath: tessdataPath });
-          fullOcrText += text + ' ';
+          try {
+            const { data: { text } } = await Tesseract.recognize(images[i], 'eng', { langPath: tessdataPath });
+            fullOcrText += text + ' ';
+          } catch (tessErr: any) {
+            console.warn(`[Layer 1] Tesseract OCR xətası (səhifə ${i + 1}): ${tessErr?.message || tessErr}`);
+          }
         }
       }
       normalizedOcrText = normalizeText(fullOcrText);
