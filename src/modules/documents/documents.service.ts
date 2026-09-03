@@ -629,10 +629,26 @@ function createMockHighRiskDocument(lang: SupportedLanguage = 'az'): Document {
 }
 
 export async function deleteDocumentRecord(docId: string): Promise<boolean> {
+  const doc = await getDocumentById(docId);
+  if (!doc) return false;
+
+  if (isFirebaseInitialized && storageBucket) {
+    const storagePath = `documents/${doc.ownerId}/${docId}_${doc.fileName}`;
+    try {
+      await storageBucket.file(storagePath).delete();
+      console.log(`[Document Service] Successfully deleted file from Firebase Storage: ${storagePath}`);
+    } catch (err: any) {
+      if (err.code === 404) {
+         console.warn(`[Document Service] File not found in Firebase Storage to delete: ${storagePath}`);
+      } else {
+         console.error('[Document Service] Firebase Storage delete error:', err);
+      }
+    }
+  }
+
   if (isFirebaseInitialized && db) {
     try {
       await db.collection(COLLECTIONS.DOCUMENTS).doc(docId).delete();
-      return true;
     } catch (err) {
       console.error('[Document Service] Firestore delete error:', err);
     }

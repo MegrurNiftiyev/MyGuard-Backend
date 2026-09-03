@@ -341,7 +341,19 @@ type AiMessageBlock =
 }
 ```
 
-### 🔹 4.3 `POST /api/documents/:id/clean-injection` (Təmizlənmiş Sənəd)
+### 🔹 4.3 `DELETE /api/documents/:id` (Sənədin Silinməsi)
+- **Method:** `DELETE`
+- **Təsvir:** Seçilmiş sənədi həm istifadəçinin Document Collection (verilənlər bazası) siyahısından, həm də Firebase Storage-dan (fiziki olaraq) birdəfəlik silir.
+- **Header:** `Authorization: Bearer <token>`
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Sənəd uğurla silindi"
+}
+```
+
+### 🔹 4.4 `POST /api/documents/:id/clean-injection` (Təmizlənmiş Sənəd)
 - **Response (200 OK):**
 ```json
 {

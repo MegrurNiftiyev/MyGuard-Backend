@@ -482,6 +482,19 @@ Returns side-by-side comparison between OCR visual text output and PDF raw text 
 
 ---
 
+#### `DELETE /api/documents/:id`
+Deletes the document from both the Firebase Storage and the Firestore database collection.
+
+- **Response (`200 OK`):**
+```json
+{
+  "success": true,
+  "message": "Sənəd uğurla silindi"
+}
+```
+
+---
+
 #### `POST /api/documents/:id/clean-injection`
 Sanitizes document by stripping prompt injections and generating a cleaned download URL.
 
