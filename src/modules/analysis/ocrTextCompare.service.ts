@@ -106,9 +106,9 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
 
     const extraTextSegments: string[] = [];
 
-    // Split PDF text into logical segments to isolate precise hidden text/prompts
+    // Split PDF text into logical segments to isolate precise distinct hidden text/prompts into a list
     const segments = rawPdfText
-      .split(/(?<=[.!?\n\r])|(?=\*\*\*)|(?<=\*\*\*)/)
+      .split(/(?<=[.!?;\n\r])|(?=\*\*\*)|(?<=\*\*\*)|(?<=\|)|(?=\|)/)
       .map(s => s.trim())
       .filter(s => s.length > 8);
 
