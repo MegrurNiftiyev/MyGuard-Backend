@@ -88,6 +88,16 @@ type AiMessageBlock =
   1. Sənəd siyahısında (`DocumentsPage` / `ScanPage`) və sənəd təfərrüatlarında `isConfidential === true` olduqda xüsusi **"Məxfi / Confidential Rejim"** nişanı (Badge) göstərilməlidir.
   2. Məxfi sənədlərdə Layer 3 (LLM) analizi hissəsində xüsusi bildiriş çıxarılmalıdır: *"Bu sənəd məxfi rejimdə yükləndiyi üçün xarici AI analizinə göndərilməyib"*.
 
+### ✅ Konflikt 11 — Layer 1 OCR Düzəlişləri, Azərbaycan Dili Və Dəqiq Segmentasiya
+- **Azərbaycan Dili Dəstəyi:** Tesseract OCR mühərriki üçün `aze.traineddata` yükləndi və `aze+eng` dual-language rejimi aktivləşdirildi.
+- **Normalizasiya Və Pəncərə Analizi:** `normalizeForCompare` (tire unifikasiyası, simvol cütləri `№` $\rightarrow$ `no`) və `bestWindowSimilarity` sliding-window istifadə olundu.
+- **Küy Hissələrinin Və Cədvəl Xətlərinin Təmizlənməsi:** `flaggedSnippets` siyahısında sənədin adi vizual mətnlərinin və cədvəl sətirlərinin parçalanıb küy kimi düşməsinin qarşısı alındı. `flaggedSnippets` yalnız və yalnız əsl gizli Prompt Injection mətni bloklarını saxlayır.
+
+### ✅ Konflikt 12 — Risk Scoring Mərkəzləşdirilməsi, Layer 3 Block Enforcement Və 4-Status Sistemi
+- **Mərkəzləşdirilmiş Sabitlər:** Bütün scoring thresholds, çəkilər və floor dəyərləri `riskScoring.config.ts` faylına cəmləndi.
+- **Layer 3 `BLOCK` İcrası:** LLM-in `recommendedAction` daxilində `BLOCK` tövsiyəsi verildikdə `overallRiskScore` minimum 85-ə qaldırılır və sənədin `finalStatus` dəyəri məcburi olaraq `'blocked'` təyin olunur.
+- **4 Dürüst Status Bucket-i:** Yekun statuslar 4 dəqiq kateqoriyaya gətirildi: `'safe'`, `'suspicious'`, `'high_risk'`, `'blocked'`.
+
 ---
 
 ## 🔒 3. Autentifikasiya və İstifadəçi Sistemləri (`/api/auth` & `/api/users`)
@@ -541,6 +551,18 @@ Audit sonrası arxitekturaya aşağıdakı inteqrasiya və təhlükəsizlik yeni
 - Bütün test `mock-storage` URL-ləri ləğv edildi, xüsusən `cleanInjection` artıq həqiqi URL qaytarır.
 - FastAPI ML servisində `ALLOW_DUMMY_MODEL_FALLBACK` tamamilə söndürüldü, heç bir saxta təsnifat qaytarılmır.
 - Koda aid bütün TypeScript (`tsc`) xətaları və interfeys uyğunsuzluqları təmizləndi.
+
+### 🔹 9.8 Layer 1 OCR Müqayisəsi & Azerbaijan Dual Language (aze+eng)
+- **OCR Mühərriki:** Tesseract üçün `aze.traineddata` modeli ilə dual-lang (`aze+eng`) OCR təmin olunur.
+- **Bütöv Abzas Səviyyəsində Bölünmə:** Vertikal `|` və cümlə daxili simvollara görə bölünmə ləğv edildi, mətn yalnız məntiqi abzaslar və bütöv cümlələr üzrə təhlil olunur.
+- **Söz-Örtüşmə (Word-Overlap Ratio) Yoxlanışı:** Hər bir PDF mətn blokundakı sözlərin $\ge 45\%$-i vizual OCR-da tapıldıqda blok görünən hesab olunur. Vizual OCR-da görünməyən bloklar gizli Prompt Injection kimi `flaggedSnippets` siyahısına salınır.
+- **Qonşu Cümlələrin Birləşdirilməsi:** Yan-yana gələn gizli cümlələr tək bütöv Prompt Injection mətni kimi birləşdirilir.
+
+### 🔹 9.9 Mərkəzləşdirilmiş Risk Qiymətləndirmə Konfiqurasiyası (`riskScoring.config.ts`) Və 4-Statuslu Sistem
+- Bütün bal sabitləri (threat floor, status cutoffs, çəkilər) `riskScoring.config.ts` faylına yığıldı.
+- Layer 3 çatışmayan `confidence` üçün 0.95 (yalançı yüksək əminlik) əvəzinə neytral `0.5` təyin olundu və xəbərdarlıq loqu yazıldı.
+- Layer 3-ün `recommendedAction` daxilində `BLOCK` tövsiyəsi verildiyi hallarda bal minimum `85+`-ə qaldırılır və sənədin `finalStatus`-u məcburi olaraq `'blocked'` təyin olunur.
+- Sənəd statusları 4 dəqiq kateqoriyada eyniləşdirildi: `'safe'` (<35), `'suspicious'` (35-79), `'high_risk'` (>=80), `'blocked'` (LLM blok tövsiyəsi).
 
 ---
 
