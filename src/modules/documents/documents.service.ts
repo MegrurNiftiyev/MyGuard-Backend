@@ -465,6 +465,37 @@ export async function getUserDocuments(userId: string): Promise<DocumentListItem
   }));
 }
 
+export async function getUserFullDocuments(userId?: string): Promise<Document[]> {
+  const docs: Document[] = [];
+  if (isFirebaseInitialized && db) {
+    try {
+      let query: any = db.collection(COLLECTIONS.DOCUMENTS);
+      if (userId) {
+        query = query.where('ownerId', '==', userId);
+      }
+      const snapshot = await query.get();
+      snapshot.forEach((doc: any) => docs.push(doc.data() as Document));
+    } catch (err) {
+      console.warn('[Document Service] Firestore query fallback:', err);
+    }
+  }
+
+  if (docs.length === 0) {
+    const memDocs = Array.from(memoryDocuments.values());
+    if (userId) {
+      const filtered = memDocs.filter(d => d.ownerId === userId);
+      docs.push(...(filtered.length > 0 ? filtered : memDocs));
+    } else {
+      docs.push(...memDocs);
+    }
+  }
+
+  return docs.map(d => ({
+    ...d,
+    isContainInjection: Boolean(d.finalStatus === 'high_risk' || d.finalStatus === 'blocked' || d.layer2_classification?.label === 'injection' || d.layer3_llmReview?.isMalicious === true)
+  }));
+}
+
 export async function getDocumentById(docId: string): Promise<Document | undefined> {
   let foundDoc: Document | undefined;
 

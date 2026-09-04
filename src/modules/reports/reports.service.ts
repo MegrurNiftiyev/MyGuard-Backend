@@ -1,32 +1,85 @@
 import { RiskDashboardStats } from './reports.schema.js';
+import { getUserFullDocuments } from '../documents/documents.service.js';
 
 export async function getRiskSummaryReport(userId: string): Promise<RiskDashboardStats> {
+  const docs = await getUserFullDocuments(userId);
+
+  const totalScanned = docs.length;
+  let safeCount = 0;
+  let suspiciousCount = 0;
+  let blockedCount = 0;
+  let detectedInjectionsCount = 0;
+
+  const documentsSummary = docs.map(d => {
+    const isInjection = Boolean(d.finalStatus === 'high_risk' || d.finalStatus === 'blocked' || d.layer2_classification?.label === 'injection' || d.layer3_llmReview?.isMalicious === true);
+    if (d.finalStatus === 'safe') safeCount++;
+    else if (d.finalStatus === 'suspicious') suspiciousCount++;
+    else if (d.finalStatus === 'blocked' || d.finalStatus === 'high_risk') blockedCount++;
+    else safeCount++;
+
+    if (isInjection) detectedInjectionsCount++;
+
+    return {
+      id: d.id,
+      fileName: d.fileName,
+      uploadedAt: d.uploadedAt || new Date().toISOString(),
+      finalStatus: d.finalStatus || 'safe',
+      finalRiskScore: d.finalRiskScore ?? 0,
+      isContainInjection: isInjection,
+    };
+  });
+
+  const dayNames = ['Bazar', 'B.e', 'Ç.ə', 'Çər', 'C.ə', 'Cüm', 'Şən'];
+  const trendMap: Record<string, { safe: number; suspicious: number; blocked: number }> = {};
+
+  for (const d of docs) {
+    const dateObj = new Date(d.uploadedAt || Date.now());
+    const dayLabel = dayNames[dateObj.getDay()] || 'B.e';
+    if (!trendMap[dayLabel]) {
+      trendMap[dayLabel] = { safe: 0, suspicious: 0, blocked: 0 };
+    }
+    if (d.finalStatus === 'safe') trendMap[dayLabel].safe++;
+    else if (d.finalStatus === 'suspicious') trendMap[dayLabel].suspicious++;
+    else trendMap[dayLabel].blocked++;
+  }
+
+  const riskTrend = Object.entries(trendMap).map(([date, counts]) => ({
+    date,
+    ...counts
+  }));
+
+  if (riskTrend.length === 0) {
+    riskTrend.push({ date: 'Bu gün', safe: safeCount, suspicious: suspiciousCount, blocked: blockedCount });
+  }
+
+  const catMap: Record<string, number> = {};
+  for (const d of docs) {
+    const cats = d.layer2_classification?.categories || [];
+    for (const c of cats) {
+      catMap[c] = (catMap[c] || 0) + 1;
+    }
+    if (d.layer1_ocrTextMatch?.hiddenTextDetected) {
+      catMap['Hidden Text (Zero Opacity)'] = (catMap['Hidden Text (Zero Opacity)'] || 0) + 1;
+    }
+  }
+
+  const injectionTypes = Object.entries(catMap).map(([type, count]) => ({
+    type,
+    count,
+    percentage: detectedInjectionsCount > 0 ? Math.round((count / detectedInjectionsCount) * 100) : 0
+  }));
+
   return {
-    totalScanned: 1420,
-    safeCount: 1180,
-    suspiciousCount: 175,
-    blockedCount: 65,
-    detectedInjectionsCount: 84,
-    riskTrend: [
-      { date: 'B.e', safe: 180, suspicious: 25, blocked: 8 },
-      { date: 'Ç.ə', safe: 210, suspicious: 30, blocked: 12 },
-      { date: 'Çər', safe: 195, suspicious: 20, blocked: 5 },
-      { date: 'C.ə', safe: 230, suspicious: 35, blocked: 15 },
-      { date: 'Cüm', safe: 205, suspicious: 28, blocked: 10 },
-      { date: 'Şən', safe: 90, suspicious: 12, blocked: 3 },
-      { date: 'Bazar', safe: 70, suspicious: 25, blocked: 12 },
-    ],
-    injectionTypes: [
-      { type: 'Hidden Text (Zero Opacity)', count: 38, percentage: 45 },
-      { type: 'Instruction Override', count: 26, percentage: 31 },
-      { type: 'Ranking Manipulation', count: 12, percentage: 14 },
-      { type: 'External Action Request', count: 8, percentage: 10 },
-    ],
+    totalScanned,
+    safeCount,
+    suspiciousCount,
+    blockedCount,
+    detectedInjectionsCount,
+    riskTrend,
+    injectionTypes: injectionTypes.length > 0 ? injectionTypes : [{ type: 'Aktiv Injection Tapılmadı', count: 0, percentage: 0 }],
     departmentRisks: [
-      { department: 'HR Screening', scanned: 540, riskRate: 14 },
-      { department: 'Müqavilələr və Tender', scanned: 380, riskRate: 22 },
-      { department: 'Maliyyə', scanned: 310, riskRate: 6 },
-      { department: 'Müdafiə və Strateji', scanned: 190, riskRate: 35 },
+      { department: 'Sənəd Yoxlamaları', scanned: totalScanned, riskRate: totalScanned > 0 ? Math.round((blockedCount / totalScanned) * 100) : 0 },
     ],
+    documentsSummary,
   };
 }

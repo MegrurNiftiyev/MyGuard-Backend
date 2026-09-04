@@ -282,6 +282,14 @@ export interface RiskDashboardStats {
   riskTrend: Array<{ date: string; safe: number; suspicious: number; blocked: number }>;
   injectionTypes: Array<{ type: string; count: number; percentage: number }>;
   departmentRisks: Array<{ department: string; scanned: number; riskRate: number }>;
+  documentsSummary?: Array<{
+    id: string;
+    fileName: string;
+    uploadedAt: string;
+    finalStatus: RiskStatus;
+    finalRiskScore: number;
+    isContainInjection: boolean;
+  }>;
 }
 
 export interface Layer1Metrics {
