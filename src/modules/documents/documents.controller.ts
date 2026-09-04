@@ -75,7 +75,7 @@ export async function getDocumentComparison(req: AuthenticatedRequest, res: Resp
     ocrPdfMatch: document.layer1_ocrTextMatch?.matchPercent || 100,
     hiddenTextDetected: document.layer1_ocrTextMatch?.hiddenTextDetected || false,
     textDifferenceFound: document.layer1_ocrTextMatch?.textDifferenceFound || false,
-    flaggedSnippet: document.layer1_ocrTextMatch?.differenceSnippet || document.layer1_ocrTextMatch?.extraTextSegments?.[0] || '',
+    flaggedSnippet: document.layer1_ocrTextMatch?.differenceSnippet || (document.layer1_ocrTextMatch?.extraTextSegments || []).join('\n\n') || '',
     flaggedSnippets: document.layer1_ocrTextMatch?.differenceSnippets || document.layer1_ocrTextMatch?.extraTextSegments || [],
     flaggedMetadata: {
       pageNumber: 1,

@@ -148,45 +148,76 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
 
     const extraTextSegments: string[] = [];
 
-    // Split PDF text into logical segments to isolate precise distinct hidden text/prompts into a list
-    const segments = rawPdfText
-      .split(/(?<=[.!?;\n\r])|(?=\*\*\*)|(?<=\*\*\*)|(?<=\|)|(?=\|)|(?=\bConfidential\b)|(?<=\bConfidential\b)|(?=\bInternal Use\b)|(?<=\bInternal Use\b)/i)
-      .map(s => s.trim())
-      .filter(s => s.length > 8 && !isStructuralNoise(s));
+    // Helper to extract significant words (length >= 3)
+    const extractWords = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(w => w.length >= 3);
+    const ocrWordsSet = new Set(extractWords(normalizedOcrTextForCompare));
 
-    for (const seg of segments) {
-      const normSeg = normalizeForCompare(seg);
-      // Check if segment exists anywhere in visual OCR text using window similarity
-      const existsInOcr = normalizedOcrTextForCompare.includes(normSeg) || 
-                          bestWindowSimilarity(normSeg, normalizedOcrTextForCompare) > 0.68;
-      
-      if (!existsInOcr) {
-        if (!extraTextSegments.some(existing => existing.includes(seg) || seg.includes(existing))) {
-          extraTextSegments.push(seg);
+    // Split PDF text into logical blocks / paragraphs (do NOT split on table pipes '|' or punctuation inside lines)
+    const rawBlocks = rawPdfText
+      .split(/(?:\r?\n)+|(?<=[.!?])\s+(?=[A-Z\[])/i)
+      .map(s => s.trim())
+      .filter(s => s.length >= 15 && !isStructuralNoise(s));
+
+    for (const block of rawBlocks) {
+      const blockWords = extractWords(block);
+      if (blockWords.length < 3) continue;
+
+      let matchedWords = 0;
+      for (const w of blockWords) {
+        if (ocrWordsSet.has(w) || normalizedOcrTextForCompare.includes(w)) {
+          matchedWords++;
+        }
+      }
+
+      const ratio = matchedWords / blockWords.length;
+      // If less than 45% of words are present in OCR text and window similarity is low, it is missing (hidden) text!
+      const normBlock = normalizeForCompare(block);
+      const isVisibleInOcr = ratio >= 0.45 || bestWindowSimilarity(normBlock, normalizedOcrTextForCompare) > 0.60;
+
+      if (!isVisibleInOcr) {
+        if (!extraTextSegments.some(existing => existing.includes(block) || block.includes(existing))) {
+          extraTextSegments.push(block);
         }
       }
     }
 
-    // Fallback if sentence-based parsing missed something but matchPercent is low
+    // Fallback using diffWords if block-level checks didn't catch a major discrepancy
     if (extraTextSegments.length === 0 && matchPercent < 90) {
       const diffs = diffWords(normalizedOcrTextForCompare, normalizedPdfTextForCompare);
       for (const part of diffs) {
-        if (part.added && part.value.trim().length > 10) {
+        if (part.added && part.value.trim().length > 15) {
           const val = part.value.trim();
-          if (!extraTextSegments.includes(val)) {
+          if (!extraTextSegments.includes(val) && !isStructuralNoise(val)) {
             extraTextSegments.push(val);
           }
         }
       }
     }
 
-    const hiddenTextDetected = matchPercent < 90 || extraTextSegments.length > 0;
-    console.log(`[Layer 1] Nəticə: Uyğunluq ${matchPercent}%. Dəqiq gizli mətn blokları:`, extraTextSegments.length);
+    // Merge contiguous extra text segments into complete prompt injection paragraphs
+    const mergedExtraSegments: string[] = [];
+    const normalizedRawPdf = rawPdfText.replace(/\s+/g, ' ');
+    for (const seg of extraTextSegments) {
+      if (mergedExtraSegments.length > 0) {
+        const lastIdx = mergedExtraSegments.length - 1;
+        const lastSeg = mergedExtraSegments[lastIdx];
+        const candidateCombined = `${lastSeg} ${seg}`;
+        if (normalizedRawPdf.includes(candidateCombined)) {
+          mergedExtraSegments[lastIdx] = candidateCombined;
+          continue;
+        }
+      }
+      mergedExtraSegments.push(seg);
+    }
+
+    const finalExtraSegments = mergedExtraSegments.length > 0 ? mergedExtraSegments : extraTextSegments;
+    const hiddenTextDetected = matchPercent < 90 || finalExtraSegments.length > 0;
+    console.log(`[Layer 1] Nəticə: Uyğunluq ${matchPercent}%. Dəqiq gizli mətn blokları:`, finalExtraSegments.length);
 
     return {
       matchPercent,
       hiddenTextDetected,
-      extraTextSegments: extraTextSegments.length > 0 ? extraTextSegments : undefined,
+      extraTextSegments: finalExtraSegments.length > 0 ? finalExtraSegments : undefined,
       ocrText: rawOcrText || 'OCR mətni oxundu',
       pdfTextLayer: rawPdfText || 'PDF mətn qatı oxundu',
     };
