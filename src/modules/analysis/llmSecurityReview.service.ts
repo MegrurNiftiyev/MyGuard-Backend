@@ -1,6 +1,7 @@
 import { Layer2ClassifierResult, Layer3LLMAnalysisResult } from './mockAnalysis.service.js';
 import { SupportedLanguage, translate } from '../../utils/i18n.js';
 import { env } from '../../config/env.js';
+import { RISK_SCORING } from '../documents/riskScoring.config.js';
 
 export interface LlmPromptParams {
   filename: string;
@@ -248,7 +249,7 @@ export async function evaluateLayer3SecurityLLM(
   // Heuristic fallback
   await new Promise((resolve) => setTimeout(resolve, 400));
 
-  const isMalicious = params.layer2Result.isInjection || params.hiddenTextDetected || params.matchPercent < 90;
+  const isMalicious = params.layer2Result.isInjection || params.hiddenTextDetected || params.matchPercent < RISK_SCORING.threatFloorMatchPctCutoff;
   const confidencePercent = (params.layer2Result.confidence * 100).toFixed(1);
   const allSnippets = params.extraTextSegments || [];
 

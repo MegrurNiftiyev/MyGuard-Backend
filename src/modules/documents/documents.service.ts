@@ -4,6 +4,7 @@ import { analyzeDocumentLayer1 } from '../analysis/ocrTextCompare.service.js';
 import { Layer2ClassifierResult, runMockLayer2Classifier, runMockLayer3SecurityLLM } from '../analysis/mockAnalysis.service.js';
 import { classifyDocumentText } from '../analysis/fastapi.service.js';
 import { evaluateLayer3SecurityLLM } from '../analysis/llmSecurityReview.service.js';
+import { RISK_SCORING } from './riskScoring.config.js';
 import { Document, DocumentListItem, RiskStatus, ThreatItem, ScanStep, ScanSocketEvent } from './documents.schema.js';
 import { io } from '../../server.js';
 import { AppError } from '../../errors/AppError.js';
@@ -12,7 +13,7 @@ import { translate, SupportedLanguage } from '../../utils/i18n.js';
 const memoryDocuments = new Map<string, Document>();
 
 function pickSocketFields(doc: Document): ScanSocketEvent['fileData'] {
-  const derivedInjection = doc.finalStatus === 'high_risk' || doc.layer2_classification?.label === 'injection' || doc.layer3_llmReview?.isMalicious === true;
+  const derivedInjection = doc.finalStatus === 'high_risk' || doc.finalStatus === 'blocked' || doc.layer2_classification?.label === 'injection' || doc.layer3_llmReview?.isMalicious === true;
   return {
     currentStep: doc.currentStep,
     stepStatus: doc.stepStatus,
@@ -349,18 +350,18 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
     let l1Score = 100 - matchPct; // Mismatch percent
     if (layer1Result.hiddenTextDetected) {
       const extraCount = layer1Result.extraTextSegments?.length || 1;
-      l1Score = Math.max(l1Score, 75 + Math.min(extraCount * 5, 20)); // Base 75-95 if hidden text is detected
+      l1Score = Math.max(l1Score, RISK_SCORING.hiddenTextFloorBase + Math.min(extraCount * RISK_SCORING.hiddenTextFloorPerSegment, RISK_SCORING.hiddenTextFloorCap));
     }
 
     // Factor 2: Layer 2 RETVec + CNN ML Classifier Score (0-100)
     let l2Score = 0;
     if (layer2Result && fastApiResult) {
       if (layer2Result.isInjection) {
-        l2Score = Math.round(layer2Result.confidence * 100);
+        l2Score = Math.round(layer2Result.confidence * RISK_SCORING.l2InjectionMultiplier);
       } else if (layer2Result.classification === 'Suspicious') {
-        l2Score = Math.round(layer2Result.confidence * 70);
+        l2Score = Math.round(layer2Result.confidence * RISK_SCORING.l2SuspiciousMultiplier);
       } else {
-        l2Score = Math.round((1 - layer2Result.confidence) * 20);
+        l2Score = Math.round((1 - layer2Result.confidence) * RISK_SCORING.l2SafeResidualCap);
       }
     } else {
       // Fallback if FastAPI ML microservice was offline
@@ -372,49 +373,66 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
     if (isConfidential) {
       l3Score = 0; // Layer 3 bypassed for confidential docs
     } else if (layer3Result) {
+      if (!layer3Result.confidence) {
+        console.warn(`[Document Service] Layer 3 confidence missing for ${filename}, defaulting to neutral baseline ${RISK_SCORING.l3DefaultConfidence}`);
+      }
+      const l3Conf = layer3Result.confidence || RISK_SCORING.l3DefaultConfidence;
       if (layer3Result.isMalicious) {
-        l3Score = Math.round((layer3Result.confidence || 0.95) * 100);
+        l3Score = Math.round(l3Conf * RISK_SCORING.l3MaliciousMultiplier);
       } else {
-        l3Score = Math.round((1 - (layer3Result.confidence || 0.95)) * 20);
+        l3Score = Math.round((1 - l3Conf) * RISK_SCORING.l3SafeResidualCap);
       }
     }
 
     // Combine 3 Factors with Weights
     if (isConfidential) {
-      overallRiskScore = Math.round(l1Score * 0.5 + l2Score * 0.5);
+      overallRiskScore = Math.round(l1Score * RISK_SCORING.weightsConfidential.l1 + l2Score * RISK_SCORING.weightsConfidential.l2);
     } else if (!fastApiResult) {
       // If Layer 2 was offline
-      overallRiskScore = Math.round(l1Score * 0.4 + l3Score * 0.6);
+      overallRiskScore = Math.round(l1Score * RISK_SCORING.weightsL2Offline.l1 + l3Score * RISK_SCORING.weightsL2Offline.l3);
     } else {
-      // All 3 Layers Active: 30% Layer 1, 35% Layer 2, 35% Layer 3
-      overallRiskScore = Math.round(l1Score * 0.30 + l2Score * 0.35 + l3Score * 0.35);
+      // All 3 Layers Active
+      overallRiskScore = Math.round(
+        l1Score * RISK_SCORING.weightsStandard.l1 + 
+        l2Score * RISK_SCORING.weightsStandard.l2 + 
+        l3Score * RISK_SCORING.weightsStandard.l3
+      );
     }
 
     // Absolute Threat Override Floor:
-    // If any layer strongly identifies an active prompt injection threat, ensure high risk score (at least 85)
-    if (layer3Result?.isMalicious || isInjection || (layer1Result.hiddenTextDetected && matchPct < 90)) {
-      overallRiskScore = Math.max(overallRiskScore, 85);
+    // If any layer strongly identifies an active prompt injection threat, ensure high risk score (at least threatFloorScore)
+    const isLlmBlockRecommended = Boolean(layer3Result?.recommendedAction?.toUpperCase().includes('BLOCK'));
+    if (layer3Result?.isMalicious || isInjection || isLlmBlockRecommended || (layer1Result.hiddenTextDetected && matchPct < RISK_SCORING.threatFloorMatchPctCutoff)) {
+      overallRiskScore = Math.max(overallRiskScore, RISK_SCORING.threatFloorScore);
     }
 
     // Bound score between 0 and 100
     overallRiskScore = Math.min(100, Math.max(0, overallRiskScore));
   }
 
-  const status: RiskStatus = layer1Result.isSystemError ? 'safe' : (overallRiskScore >= 80 ? 'high_risk' : overallRiskScore >= 35 ? 'suspicious' : 'safe');
-
+  const isLlmBlockRecommended = Boolean(layer3Result?.recommendedAction?.toUpperCase().includes('BLOCK'));
+  const status: RiskStatus = layer1Result.isSystemError 
+    ? 'safe' 
+    : isLlmBlockRecommended
+      ? 'blocked'
+      : (overallRiskScore >= RISK_SCORING.statusHighRiskCutoff 
+        ? 'high_risk' 
+        : overallRiskScore >= RISK_SCORING.statusSuspiciousCutoff 
+          ? 'suspicious' 
+          : 'safe');
 
   await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { 
     stepStatus: 'completed',
     layer3_llmReview: {
-      used: overallRiskScore > 60 || layer3Result.isMalicious,
-      isMalicious: layer3Result.isMalicious,
-      confidence: layer3Result.confidence || 0.97,
-      explanation: layer3Result.explanation,
-      message: layer3Result.explanation,
-      recommendedAction: layer3Result.recommendedAction,
-      attackVector: layer3Result.attackVector,
-      reasoning: layer3Result.reasoning,
-      mitigationSteps: layer3Result.mitigationSteps,
+      used: overallRiskScore > RISK_SCORING.llmReviewUsedCutoff || layer3Result?.isMalicious || false,
+      isMalicious: layer3Result?.isMalicious || false,
+      confidence: layer3Result?.confidence || RISK_SCORING.l3DefaultConfidence,
+      explanation: layer3Result?.explanation || '',
+      message: layer3Result?.explanation || '',
+      recommendedAction: layer3Result?.recommendedAction || '',
+      attackVector: layer3Result?.attackVector || 'N/A',
+      reasoning: layer3Result?.reasoning || '',
+      mitigationSteps: layer3Result?.mitigationSteps || [],
     },
     finalRiskScore: overallRiskScore,
     finalStatus: status

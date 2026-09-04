@@ -84,7 +84,7 @@ export interface Document {
   } | null;
 
   finalRiskScore: number | null;
-  finalStatus: 'safe' | 'suspicious' | 'high_risk' | null;
+  finalStatus: RiskStatus | null;
 
   reviewedByUser: boolean;
   userReviewLabel: boolean | null;
@@ -97,7 +97,7 @@ export interface DocumentListItem {
   id: string;
   fileName: string;
   uploadedAt: string;
-  finalStatus: 'safe' | 'suspicious' | 'high_risk' | null;
+  finalStatus: RiskStatus | null;
   finalRiskScore: number | null;
   currentStep: ScanStep | 'COMPLETED' | 'FAILED';
   isConfidential?: boolean;

@@ -87,7 +87,8 @@ The `finalRiskScore` (0-100) is dynamically computed by weighting metrics across
 - **Factor 2 (Layer 2 RETVec + CNN ML Classifier Score):** `confidence * 100` based on classification (`injection`, `suspicious`, `safe`).
 - **Factor 3 (Layer 3 Contextual LLM Review Score):** `confidence * 100` if `isMalicious === true` (bypassed for `isConfidential` documents).
 - **Weighted Formula:** `(Factor 1 * 30%) + (Factor 2 * 35%) + (Factor 3 * 35%)`.
-- **Threat Floor Override:** Any layer identifying a confirmed active prompt injection enforces a minimum score floor of `85+` (`high_risk`).
+- **Threat Floor & Block Override:** Any layer identifying a confirmed active prompt injection enforces a minimum score floor of `85+` (`high_risk` / `blocked`). If Layer 3 explicitly recommends blocking (e.g. `BLOCK`), `finalStatus` is set to `blocked`.
+- **Status Buckets:** `safe` (score < 35), `suspicious` (35 <= score < 80), `high_risk` (score >= 80), `blocked` (explicit LLM block recommendation).
 
 ### Pipeline Steps History Sequence:
 1. `DOCUMENT_UPLOADED`: Secure sandbox file receipt & metadata validation.
@@ -199,7 +200,7 @@ interface DocumentRecord {
     mitigationSteps: string[];
   };
   finalRiskScore: number;     // 0 (Safe) to 100 (Critical Threat)
-  finalStatus: 'clean' | 'low_risk' | 'medium_risk' | 'high_risk' | 'blocked';
+  finalStatus: 'safe' | 'suspicious' | 'high_risk' | 'blocked';
   reviewedByUser: boolean;
   userReviewLabel?: 'confirmed_injection' | 'false_positive' | null;
   isContainInjection: boolean;

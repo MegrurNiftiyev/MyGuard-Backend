@@ -279,7 +279,7 @@ type AiMessageBlock =
     ]
   },
   "finalRiskScore": 92,
-  "finalStatus": "high_risk",
+  "finalStatus": "blocked",
   "reviewedByUser": false,
   "userReviewLabel": null,
   "isContainInjection": true,
@@ -293,7 +293,7 @@ type AiMessageBlock =
 > 2. **Faktor 2 (Layer 2 - RETVec + CNN ML Mikroxidmət Balı):** ML modelinin təsnifatı (`injection` / `suspicious` / `safe`) və əminlik faizi (`confidence * 100`).
 > 3. **Faktor 3 (Layer 3 - OpenAI LLM Semantik Rəy Balı):** LLM-in `isMalicious` qərarı və `confidence` dərəcəsi (Məxfi sənədlərdə ötürülür).
 > - **Çəkili Düstur:** Hər 3 layer aktiv olduqda: `(Faktor 1 * 30%) + (Faktor 2 * 35%) + (Faktor 3 * 35%)`.
-> - **Kritik Təhdid Floor Qaydası:** Hər hansı bir layer aktiv prompt injection təsdiq edərsə, `finalRiskScore` minimum `85+` bal olaraq saxlanılır və sənəd `high_risk` kimi bloklanır.
+> - **Kritik Təhdid Floor & Block Qaydası:** Hər hansı bir layer aktiv prompt injection təsdiq edərsə, `finalRiskScore` minimum `85+` bal olaraq saxlanılır. Əgər Layer 3 explicit blok tövsiyəsi verərsə (`recommendedAction` daxilində `BLOCK`), `finalStatus` = `'blocked'` təyin olunur. Status dəyərləri: `'safe'` (<35), `'suspicious'` (35-79), `'high_risk'` (>=80), `'blocked'` (LLM blok tövsiyəsi).
 
 #### 📌 Nümunə: Məxfi Rejimdə (`isConfidential: true`) Yüklənmiş Sənəd Cavabı
 ```json

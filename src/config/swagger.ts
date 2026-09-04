@@ -92,7 +92,7 @@ const options: swaggerJSDoc.Options = {
               },
             },
             finalRiskScore: { type: 'integer', example: 12 },
-            finalStatus: { type: 'string', example: 'safe' },
+            finalStatus: { type: 'string', enum: ['safe', 'suspicious', 'high_risk', 'blocked'], example: 'safe' },
             reviewedByUser: { type: 'boolean', example: false },
             userReviewLabel: { type: 'boolean', nullable: true, example: null },
             isContainInjection: { type: 'boolean', example: false },
@@ -105,7 +105,7 @@ const options: swaggerJSDoc.Options = {
             documentId: { type: 'string' },
             analyzedAt: { type: 'string', format: 'date-time' },
             overallRiskScore: { type: 'integer', example: 92 },
-            status: { type: 'string', enum: ['safe', 'suspicious', 'blocked'] },
+            status: { type: 'string', enum: ['safe', 'suspicious', 'high_risk', 'blocked'] },
             layer1_ocrTextMatch: {
               type: 'object',
               properties: {
