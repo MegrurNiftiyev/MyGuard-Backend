@@ -7,11 +7,49 @@ import { env } from '../../config/env.js';
 
 const tessdataPath = path.join(process.cwd(), 'tessdata');
 
+const DASH_CHARS = /[\u2010-\u2015\u2212]/g; // en-dash, em-dash, minus sign, etc.
+const CONFUSION_PAIRS: [RegExp, string][] = [
+  [/№/g, 'no'],
+  [/no\.?/gi, 'no'],
+];
+
 function normalizeText(text: string): string {
   return text
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeForCompare(text: string): string {
+  let t = text.toLowerCase().replace(DASH_CHARS, '-');
+  for (const [pattern, replacement] of CONFUSION_PAIRS) {
+    t = t.replace(pattern, replacement);
+  }
+  t = t.replace(/\s+([,.;:!?])/g, '$1'); // remove space before punctuation
+  t = t.replace(/\s+/g, ' ').trim();
+  return t;
+}
+
+function bestWindowSimilarity(segment: string, fullText: string): number {
+  const segLen = segment.length;
+  if (fullText.length <= segLen) return stringSimilarity.compareTwoStrings(segment, fullText);
+  const step = Math.max(1, Math.min(5, Math.floor(segLen / 8)));
+  let best = 0;
+  for (let i = 0; i + segLen <= fullText.length; i += step) {
+    const window = fullText.slice(i, i + segLen);
+    const score = stringSimilarity.compareTwoStrings(segment, window);
+    if (score > best) best = score;
+  }
+  return best;
+}
+
+function isStructuralNoise(seg: string): boolean {
+  const lettersOnly = seg.replace(/[^a-zA-Z\u0400-\u04FF\u018F\u0259\u0130\u0131\u00C7\u00E7\u011E\u011F\u00D6\u00F6\u015E\u015F\u00DC\u00FC]/g, '');
+  if (lettersOnly.length < 7) return true; // Filter out short fragments with fewer than 7 letters
+  if (/^[_\s\.\-•|\d]+$/.test(seg)) return true; // Filter signature lines and divider lines
+  if (seg.includes('__')) return true; // Filter signature fill lines
+  if (/(?:imza|səhifə|\bpage\b)/i.test(seg) && /[•_\d]/.test(seg)) return true; // Footer signature dots/lines
+  return false;
 }
 
 export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
@@ -31,10 +69,12 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
     }
 
     const normalizedPdfText = normalizeText(fullPdfText);
+    const normalizedPdfTextForCompare = normalizeForCompare(fullPdfText);
     console.log('[Layer 1] PDF text-layer çıxarıldı, uzunluq:', normalizedPdfText.length);
 
     let fullOcrText = '';
     let normalizedOcrText = '';
+    let normalizedOcrTextForCompare = '';
     try {
       const images: Buffer[] = [];
       const { createCanvas } = await import('@napi-rs/canvas');
@@ -69,7 +109,7 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
             const errText = await response.text();
             console.warn(`[Layer 1] Google Vision API Xətası: ${errText}. Tesseract-a keçilir...`);
             try {
-              const { data: { text } } = await Tesseract.recognize(images[i], 'eng', { langPath: tessdataPath });
+              const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng', { langPath: tessdataPath });
               fullOcrText += text + ' ';
             } catch (tessErr: any) {
               console.warn(`[Layer 1] Tesseract OCR xətası (səhifə ${i + 1}): ${tessErr?.message || tessErr}`);
@@ -81,10 +121,10 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
           }
         }
       } else {
-        console.log(`[Layer 1] GOOGLE_VISION_API_KEY tapılmadı, Tesseract (eng) istifadə edilir...`);
+        console.log(`[Layer 1] GOOGLE_VISION_API_KEY tapılmadı, Tesseract (aze+eng) istifadə edilir...`);
         for (let i = 0; i < images.length; i++) {
           try {
-            const { data: { text } } = await Tesseract.recognize(images[i], 'eng', { langPath: tessdataPath });
+            const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng', { langPath: tessdataPath });
             fullOcrText += text + ' ';
           } catch (tessErr: any) {
             console.warn(`[Layer 1] Tesseract OCR xətası (səhifə ${i + 1}): ${tessErr?.message || tessErr}`);
@@ -92,31 +132,33 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
         }
       }
       normalizedOcrText = normalizeText(fullOcrText);
+      normalizedOcrTextForCompare = normalizeForCompare(fullOcrText);
     } catch (canvasErr: any) {
       console.warn('[Layer 1] Canvas rendering or OCR error. Using text-layer fallback:', canvasErr?.message);
       fullOcrText = fullPdfText;
       normalizedOcrText = normalizedPdfText;
+      normalizedOcrTextForCompare = normalizedPdfTextForCompare;
     }
 
     const rawPdfText = fullPdfText.replace(/\s+/g, ' ').trim();
     const rawOcrText = (fullOcrText || normalizedOcrText).replace(/\s+/g, ' ').trim();
 
-    const matchFraction = stringSimilarity.compareTwoStrings(normalizedPdfText, normalizedOcrText);
+    const matchFraction = stringSimilarity.compareTwoStrings(normalizedPdfTextForCompare, normalizedOcrTextForCompare);
     const matchPercent = Math.round(matchFraction * 100);
 
     const extraTextSegments: string[] = [];
 
     // Split PDF text into logical segments to isolate precise distinct hidden text/prompts into a list
     const segments = rawPdfText
-      .split(/(?<=[.!?;\n\r])|(?=\*\*\*)|(?<=\*\*\*)|(?<=\|)|(?=\|)/)
+      .split(/(?<=[.!?;\n\r])|(?=\*\*\*)|(?<=\*\*\*)|(?<=\|)|(?=\|)|(?=\bConfidential\b)|(?<=\bConfidential\b)|(?=\bInternal Use\b)|(?<=\bInternal Use\b)/i)
       .map(s => s.trim())
-      .filter(s => s.length > 8);
+      .filter(s => s.length > 8 && !isStructuralNoise(s));
 
     for (const seg of segments) {
-      const normSeg = normalizeText(seg);
-      // Check if segment exists anywhere in visual OCR text
-      const existsInOcr = normalizedOcrText.includes(normSeg) || 
-                          stringSimilarity.compareTwoStrings(normSeg, normalizedOcrText) > 0.4;
+      const normSeg = normalizeForCompare(seg);
+      // Check if segment exists anywhere in visual OCR text using window similarity
+      const existsInOcr = normalizedOcrTextForCompare.includes(normSeg) || 
+                          bestWindowSimilarity(normSeg, normalizedOcrTextForCompare) > 0.68;
       
       if (!existsInOcr) {
         if (!extraTextSegments.some(existing => existing.includes(seg) || seg.includes(existing))) {
@@ -127,7 +169,7 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
 
     // Fallback if sentence-based parsing missed something but matchPercent is low
     if (extraTextSegments.length === 0 && matchPercent < 90) {
-      const diffs = diffWords(normalizedOcrText, normalizedPdfText);
+      const diffs = diffWords(normalizedOcrTextForCompare, normalizedPdfTextForCompare);
       for (const part of diffs) {
         if (part.added && part.value.trim().length > 10) {
           const val = part.value.trim();

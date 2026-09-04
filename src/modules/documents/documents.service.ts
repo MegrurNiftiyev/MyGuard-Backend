@@ -220,8 +220,9 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
 
   const hasExtraText = layer1Result.extraTextSegments && layer1Result.extraTextSegments.length > 0;
   const matchPercent = layer1Result.matchPercent || 95;
-  const differenceSnippet = hasExtraText ? layer1Result.extraTextSegments.join(' | ') : (matchPercent < 100 ? translate('ocr_diff_detected', lang) : '');
-  const differenceSnippets = hasExtraText ? layer1Result.extraTextSegments : (matchPercent < 100 ? [translate('ocr_diff_detected', lang)] : []);
+  const isSuspiciousMatch = layer1Result.hiddenTextDetected || matchPercent < 90;
+  const differenceSnippet = hasExtraText ? layer1Result.extraTextSegments.join(' | ') : (isSuspiciousMatch ? translate('ocr_diff_detected', lang) : '');
+  const differenceSnippets = hasExtraText ? layer1Result.extraTextSegments : (isSuspiciousMatch ? [translate('ocr_diff_detected', lang)] : []);
 
   await updateDocumentAndEmit(docId, 'HIDDEN_TEXT_DETECTION', { 
     stepStatus: 'completed',
@@ -229,12 +230,12 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       matchPercent,
       hiddenTextDetected: layer1Result.hiddenTextDetected,
       extraTextSegments: layer1Result.extraTextSegments || [],
-      textDifferenceFound: hasExtraText || matchPercent < 100,
+      textDifferenceFound: hasExtraText || isSuspiciousMatch,
       differenceSnippet,
       differenceSnippets,
       ocrText: layer1Result.ocrText || `OCR: ${filename}`,
       pdfTextLayer: layer1Result.pdfTextLayer || `PDF text: ${filename}`,
-      status: layer1Result.hiddenTextDetected || matchPercent < 100 ? 'suspicious' : 'clean'
+      status: isSuspiciousMatch ? 'suspicious' : 'clean'
     }
   }, false, lang);
 
