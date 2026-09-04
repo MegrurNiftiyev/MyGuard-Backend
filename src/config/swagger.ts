@@ -157,6 +157,45 @@ const options: swaggerJSDoc.Options = {
             },
           },
         },
+        DepartmentEnum: {
+          type: 'string',
+          enum: [
+            'İnformasiya Texnologiyaları və Kibertəhlükəsizlik',
+            'Maliyyə və İqtisadiyyat',
+            'Hüquq və Komplaens',
+            'İnsan Resursları (HR)',
+            'Əməliyyatlar və Logistika',
+            'Strateji İnkişaf və Layihələr',
+            'Ümumi Şöbə və Dəftərxana',
+          ],
+          example: 'İnformasiya Texnologiyaları və Kibertəhlükəsizlik',
+        },
+        User: {
+          type: 'object',
+          properties: {
+            uid: { type: 'string', example: 'usr-1787753837283-12' },
+            fullName: { type: 'string', example: 'Samir Əliyev' },
+            finCode: { type: 'string', example: '7AB1234' },
+            email: { type: 'string', example: 'e.mammadov@soc.gov.az' },
+            phone: { type: 'string', example: '+994 50 123 45 67' },
+            role: { type: 'string', enum: ['admin', 'user', 'analyst'], example: 'user' },
+            department: { $ref: '#/components/schemas/DepartmentEnum' },
+            authProvider: { type: 'string', example: 'local' },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        RegisterRequest: {
+          type: 'object',
+          required: ['fullName', 'finCode', 'email', 'phone', 'password', 'department'],
+          properties: {
+            fullName: { type: 'string', example: 'Samir Əliyev' },
+            finCode: { type: 'string', example: '7AB1234' },
+            email: { type: 'string', example: 'e.mammadov@soc.gov.az' },
+            phone: { type: 'string', example: '+994 50 123 45 67' },
+            password: { type: 'string', example: 'SecretPassword123!' },
+            department: { $ref: '#/components/schemas/DepartmentEnum' },
+          },
+        },
         ChatMessage: {
           type: 'object',
           properties: {

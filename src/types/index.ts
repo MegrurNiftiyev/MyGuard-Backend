@@ -1,4 +1,7 @@
 import { Request } from 'express';
+import { Department, ALL_DEPARTMENTS } from '../modules/auth/auth.schema.js';
+
+export { Department, ALL_DEPARTMENTS };
 
 export interface AuthenticatedUser {
   uid: string;

@@ -98,6 +98,17 @@ type AiMessageBlock =
 - **Layer 3 `BLOCK` İcrası:** LLM-in `recommendedAction` daxilində `BLOCK` tövsiyəsi verildikdə `overallRiskScore` minimum 85-ə qaldırılır və sənədin `finalStatus` dəyəri məcburi olaraq `'blocked'` təyin olunur.
 - **4 Dürüst Status Bucket-i:** Yekun statuslar 4 dəqiq kateqoriyaya gətirildi: `'safe'`, `'suspicious'`, `'high_risk'`, `'blocked'`.
 
+### ✅ Konflikt 13 — `department` Sahəsinin Məcburi Enum Şəklində Tətbiqi (`POST /api/auth/register` Və `GET /api/users/me`)
+- `POST /api/auth/register` request body-sində `department` sahəsi artıq **məcburidir (required)** və mütləq aşağıdakı **7 rəsmi Azərbaycan dili Enum dəyərindən biri** olmalıdır:
+  1. `"İnformasiya Texnologiyaları və Kibertəhlükəsizlik"`
+  2. `"Maliyyə və İqtisadiyyat"`
+  3. `"Hüquq və Komplaens"`
+  4. `"İnsan Resursları (HR)"`
+  5. `"Əməliyyatlar və Logistika"`
+  6. `"Strateji İnkişaf və Layihələr"`
+  7. `"Ümumi Şöbə və Dəftərxana"`
+- `GET /api/users/me` cavabında `user.department` sahəsi mütləq bu 7 enum dəyərindən birini qaytarır.
+
 ---
 
 ## 🔒 3. Autentifikasiya və İstifadəçi Sistemləri (`/api/auth` & `/api/users`)
@@ -113,7 +124,7 @@ type AiMessageBlock =
   "email": "e.mammadov@soc.gov.az",
   "phone": "+994 50 123 45 67",
   "password": "SecretPassword123!",
-  "department": "Təhlükəsizlik və İnformasiya İdarəsi"
+  "department": "İnformasiya Texnologiyaları və Kibertəhlükəsizlik"
 }
 ```
 - **Response (201 Created):**
@@ -129,7 +140,7 @@ type AiMessageBlock =
     "email": "e.mammadov@soc.gov.az",
     "phone": "+994 50 123 45 67",
     "role": "user",
-    "department": "Təhlükəsizlik və İnformasiya İdarəsi"
+    "department": "İnformasiya Texnologiyaları və Kibertəhlükəsizlik"
   }
 }
 ```
@@ -156,7 +167,7 @@ type AiMessageBlock =
     "finCode": "7AB1234",
     "email": "e.mammadov@soc.gov.az",
     "role": "admin",
-    "department": "Təhlükəsizlik İdarəsi"
+    "department": "İnformasiya Texnologiyaları və Kibertəhlükəsizlik"
   }
 }
 ```

@@ -146,7 +146,7 @@ interface UserDocument {
   email: string;
   phone: string;
   role: 'user' | 'admin';
-  department?: string;
+  department: Department;     // Required enum (7 Azerbaijani department strings)
   createdAt: string;          // ISO Timestamp
   lastLoginAt?: string;
 }

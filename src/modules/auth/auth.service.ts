@@ -10,6 +10,8 @@ import {
   LoginDto,
   AuthResponse,
   OAuthLoginDto,
+  Department,
+  ALL_DEPARTMENTS,
 } from './auth.schema.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'myguard-super-secret-jwt-key-2026';
@@ -27,12 +29,19 @@ const defaultAdmin: UserRecord = {
   phone: '+994 50 123 45 67',
   passwordHash: bcrypt.hashSync('Admin123!', 10),
   role: 'admin',
-  department: 'Təhlükəsizlik və İnformasiya İdarəsi',
+  department: Department.IT_CYBERSECURITY,
   authProvider: 'local',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
 memoryUsers.set(defaultAdmin.uid, defaultAdmin);
+
+function normalizeDepartment(dept?: string): Department {
+  if (dept && ALL_DEPARTMENTS.includes(dept as Department)) {
+    return dept as Department;
+  }
+  return Department.IT_CYBERSECURITY;
+}
 
 function sanitizeProfile(user: UserRecord): UserProfile {
   return {
@@ -42,7 +51,7 @@ function sanitizeProfile(user: UserRecord): UserProfile {
     email: user.email,
     phone: user.phone,
     role: user.role,
-    department: user.department,
+    department: normalizeDepartment(user.department),
     authProvider: user.authProvider,
     createdAt: user.createdAt,
   };
@@ -172,7 +181,12 @@ export async function registerUser(dto: RegisterDto): Promise<AuthResponse> {
     throw new AppError(`'${normalizedEmail}' e-poçt ünvanı ilə artıq qeydiyyatdan keçilib. E-poçt təkrar oluna bilməz.`, 409);
   }
 
-  // 7. Hash password
+  // 7. Validate Department Enum
+  if (!dto.department || !ALL_DEPARTMENTS.includes(dto.department as Department)) {
+    throw new AppError(`Mütləq keçərli bir departament seçilməlidir. İcazə verilən departamentlər: ${ALL_DEPARTMENTS.join(', ')}`, 400);
+  }
+
+  // 8. Hash password
   const passwordHash = await bcrypt.hash(dto.password, 10);
   const uid = 'usr-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
   const now = new Date().toISOString();
@@ -185,7 +199,7 @@ export async function registerUser(dto: RegisterDto): Promise<AuthResponse> {
     phone: normalizedPhone,
     passwordHash,
     role: dto.role || 'user',
-    department: dto.department || 'Dövlət / Korporativ İdarə',
+    department: dto.department as Department,
     authProvider: 'local',
     createdAt: now,
     updatedAt: now,
