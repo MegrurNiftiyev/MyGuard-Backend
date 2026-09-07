@@ -576,14 +576,13 @@ Audit sonrası arxitekturaya aşağıdakı inteqrasiya və təhlükəsizlik yeni
 - Sənəd statusları 4 dəqiq kateqoriyada eyniləşdirildi: `'safe'` (<35), `'suspicious'` (35-79), `'high_risk'` (>=80), `'blocked'` (LLM blok tövsiyəsi).
 
 ### 🔹 9.10 AI Assistent Cavablarında Səhifə Yönləndirmə (Navigation Redirect) Kontraktı
-- AI Chat Assistent cavablarında istifadəçini müvafiq səhifələrə yönləndirmək üçün **ScreenDestination Enum** standartlaşdırıldı:
+- AI Chat Assistent cavablarında istifadəçini müvafiq səhifələrə yönləndirmək üçün **ScreenDestination Enum** standartlaşdırıldı (Cəmi 5 aktiv səhifə):
   - `"HOME_SCREEN"` $\rightarrow$ Əsas səhifə (`/home`)
   - `"DOCUMENTS_SCREEN"` $\rightarrow$ Sənədlər (`/documents`)
   - `"SCAN_SCREEN"` $\rightarrow$ Skan et (`/scan`)
-  - `"RISKS_SCREEN"` $\rightarrow$ Risklər (`/risks`)
   - `"AI_SCREEN"` $\rightarrow$ AI Assistant (`/ai-assistant`)
   - `"SETTINGS_SCREEN"` $\rightarrow$ Parametrlər (`/settings`)
-- AI cavabında `type: 'link'` bloku verdikdə, `url` sahəsi bu 6 enum dəyərindən birini daşıyır:
+- AI cavabında `type: 'link'` bloku verdikdə, `url` sahəsi bu 5 enum dəyərindən birini daşıyır:
   ```json
   {
     "type": "link",
@@ -613,7 +612,7 @@ Audit sonrası arxitekturaya aşağıdakı inteqrasiya və təhlükəsizlik yeni
     ]
   }
   ```
-- **Frontend Tələbi:** İstifadəçi AI cavabındakı düyməyə/linkə kliki zamanı `block.url` və ya `navigation.targetScreen` / `navigation.route` dəyərini oxuyub uyğun marşruta (`/scan`, `/risks`, `/documents` və s.) keçidi təmin etməlidir.
+- **Frontend Tələbi:** İstifadəçi AI cavabındakı düyməyə/linkə kliki zamanı `block.url` və ya `navigation.targetScreen` / `navigation.route` dəyərini oxuyub uyğun marşruta (`/scan`, `/documents`, `/home` və s.) keçidi təmin etməlidir.
 
 ---
 

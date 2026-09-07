@@ -128,9 +128,9 @@ export async function callLlmSmall(systemPrompt: string, message: string): Promi
   const smallChatPromptHeader = `${systemPrompt}\n
 CRITICAL SMALL CHAT & NAVIGATION CONTRACT:
 - Respond in Azerbaijani concise natural text.
-- IF the user asks to navigate to a page, upload/scan files, view documents, check risk logs, or change settings:
+- IF the user asks to navigate to a page, upload/scan files, view documents, or change settings:
   1. Mention the target page clearly in text.
-  2. Include a "link" block in "blocks" array with "url" set to one of the 6 ScreenDestination Enum values: "HOME_SCREEN", "DOCUMENTS_SCREEN", "SCAN_SCREEN", "RISKS_SCREEN", "AI_SCREEN", "SETTINGS_SCREEN".
+  2. Include a "link" block in "blocks" array with "url" set to one of the 5 ScreenDestination Enum values: "HOME_SCREEN", "DOCUMENTS_SCREEN", "SCAN_SCREEN", "AI_SCREEN", "SETTINGS_SCREEN".
   3. Include a "navigation" object: { "targetScreen": "ENUM", "label": "[Səhifə] səhifəsinə keç", "route": "/route" }.
 - Respond in JSON format matching schema:
 {
@@ -199,8 +199,6 @@ If no page navigation is needed, "navigation" and "blocks" can be omitted or emp
       const lowerMsg = (message + ' ' + parsedText).toLowerCase();
       if (lowerMsg.includes('skan') || lowerMsg.includes('yüklə') || lowerMsg.includes('scan')) {
         navMetadata = extractNavigationMetadata('SCAN_SCREEN');
-      } else if (lowerMsg.includes('risk') || lowerMsg.includes('blok') || lowerMsg.includes('təhlükə')) {
-        navMetadata = extractNavigationMetadata('RISKS_SCREEN');
       } else if (lowerMsg.includes('sənəd') || lowerMsg.includes('document')) {
         navMetadata = extractNavigationMetadata('DOCUMENTS_SCREEN');
       } else if (lowerMsg.includes('parametr') || lowerMsg.includes('tənzimləmə') || lowerMsg.includes('setting')) {

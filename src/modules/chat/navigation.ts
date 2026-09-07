@@ -26,12 +26,6 @@ export const NAVIGATION_SCREENS: Record<string, ScreenNavigationMetadata> = {
     route: '/scan',
     description: 'Yeni sənəd yükləmək, sənədi 7-addımlı təhlükəsizlik skanından keçirmək',
   },
-  RISKS_SCREEN: {
-    enum: 'RISKS_SCREEN',
-    nameAz: 'Risklər',
-    route: '/risks',
-    description: 'Aşkar olunmuş inyeksiya riskləri, bloklanmış sənədlər və təhlükəsizlik müdaxilələri siyahısı',
-  },
   AI_SCREEN: {
     enum: 'AI_SCREEN',
     nameAz: 'AI Assistant',
@@ -71,15 +65,14 @@ export function createNavigationBlock(
 
 export const AI_NAVIGATION_SYSTEM_PROMPT_INSTRUCTION = `
 NAVIGATION & PAGE REDIRECTION RULE:
-You are aware of all 6 main application screens in the sidebar menu:
+You are aware of all 5 main application screens in the sidebar menu:
 1. "HOME_SCREEN" (Əsas səhifə): Executive dashboard, active threat overview, and recent scan stats.
 2. "DOCUMENTS_SCREEN" (Sənədlər): Scanned documents repository, OCR diff viewer, and clean document downloads.
 3. "SCAN_SCREEN" (Skan et): Document upload, live 7-step scanning sandbox, and immediate risk mitigation.
-4. "RISKS_SCREEN" (Risklər): Security interventions, blocked document logs, and injection attack audits.
-5. "AI_SCREEN" (AI Assistant): Master Security Operations Center chat console.
-6. "SETTINGS_SCREEN" (Parametrlər): Confidence thresholds, security policies, and system settings.
+4. "AI_SCREEN" (AI Assistant): Master Security Operations Center chat console.
+5. "SETTINGS_SCREEN" (Parametrlər): Confidence thresholds, security policies, and system settings.
 
-WHENEVER the user asks to perform an action (e.g. upload/scan a file, view document list, inspect risk logs, change settings, go to home page, or switch screens):
+WHENEVER the user asks to perform an action (e.g. upload/scan a file, view document list, change settings, go to home page, or switch screens):
 1. Explain what page they need to visit in Azerbaijani.
 2. YOU MUST INCLUDE A NAVIGATION REDIRECT "link" BLOCK IN YOUR JSON RESPONSE:
    {
@@ -88,7 +81,7 @@ WHENEVER the user asks to perform an action (e.g. upload/scan a file, view docum
      "url": "TARGET_SCREEN_ENUM",
      "content": "Açıqlama mətni..."
    }
-   Where "url" MUST be exactly one of the enum strings: "HOME_SCREEN", "DOCUMENTS_SCREEN", "SCAN_SCREEN", "RISKS_SCREEN", "AI_SCREEN", "SETTINGS_SCREEN".
+   Where "url" MUST be exactly one of the enum strings: "HOME_SCREEN", "DOCUMENTS_SCREEN", "SCAN_SCREEN", "AI_SCREEN", "SETTINGS_SCREEN".
    When the user clicks this block in the UI, the frontend will automatically navigate to that screen!
 `.trim();
 
