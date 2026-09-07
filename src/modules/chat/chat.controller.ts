@@ -57,9 +57,14 @@ export async function sendMessage(req: AuthenticatedRequest, res: Response) {
   const systemPrompt = getSystemPromptFor(dest, mode);
 
   if (mode === ChatMode.SMALL_CHAT) {
-    const reply = await callLlmSmall(systemPrompt, actualMessage);
-    await logSmallChatMessage({ screenDestination: dest, message: actualMessage, reply }); // fire-and-forget
-    const response: SmallChatMessage = { chatMode: mode, text: reply };
+    const smallResult = await callLlmSmall(systemPrompt, actualMessage);
+    await logSmallChatMessage({ screenDestination: dest, message: actualMessage, reply: smallResult.text }); // fire-and-forget
+    const response: SmallChatMessage = { 
+      chatMode: mode, 
+      text: smallResult.text,
+      navigation: smallResult.navigation,
+      blocks: smallResult.blocks,
+    };
     return res.json(response);
   }
 

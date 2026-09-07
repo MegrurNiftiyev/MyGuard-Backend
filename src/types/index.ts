@@ -213,8 +213,9 @@ export const ScreenDestination = {
   HOME_SCREEN: 'HOME_SCREEN',
   DOCUMENTS_SCREEN: 'DOCUMENTS_SCREEN',
   SCAN_SCREEN: 'SCAN_SCREEN',
-  SETTINGS_SCREEN: 'SETTINGS_SCREEN',
+  RISKS_SCREEN: 'RISKS_SCREEN',
   AI_SCREEN: 'AI_SCREEN',
+  SETTINGS_SCREEN: 'SETTINGS_SCREEN',
 } as const;
 export type ScreenDestination = typeof ScreenDestination[keyof typeof ScreenDestination] | string;
 
@@ -241,6 +242,12 @@ export interface SendChatMessageRequest {
 export interface SmallChatMessage {
   chatMode: typeof ChatMode.SMALL_CHAT | string;
   text: string;
+  navigation?: {
+    targetScreen: ScreenDestination;
+    label: string;
+    route: string;
+  };
+  blocks?: MessageBlock[];
 }
 
 export interface LargeChatMessage {

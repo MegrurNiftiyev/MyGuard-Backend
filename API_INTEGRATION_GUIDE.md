@@ -575,6 +575,46 @@ Audit sonrası arxitekturaya aşağıdakı inteqrasiya və təhlükəsizlik yeni
 - Layer 3-ün `recommendedAction` daxilində `BLOCK` tövsiyəsi verildiyi hallarda bal minimum `85+`-ə qaldırılır və sənədin `finalStatus`-u məcburi olaraq `'blocked'` təyin olunur.
 - Sənəd statusları 4 dəqiq kateqoriyada eyniləşdirildi: `'safe'` (<35), `'suspicious'` (35-79), `'high_risk'` (>=80), `'blocked'` (LLM blok tövsiyəsi).
 
+### 🔹 9.10 AI Assistent Cavablarında Səhifə Yönləndirmə (Navigation Redirect) Kontraktı
+- AI Chat Assistent cavablarında istifadəçini müvafiq səhifələrə yönləndirmək üçün **ScreenDestination Enum** standartlaşdırıldı:
+  - `"HOME_SCREEN"` $\rightarrow$ Əsas səhifə (`/home`)
+  - `"DOCUMENTS_SCREEN"` $\rightarrow$ Sənədlər (`/documents`)
+  - `"SCAN_SCREEN"` $\rightarrow$ Skan et (`/scan`)
+  - `"RISKS_SCREEN"` $\rightarrow$ Risklər (`/risks`)
+  - `"AI_SCREEN"` $\rightarrow$ AI Assistant (`/ai-assistant`)
+  - `"SETTINGS_SCREEN"` $\rightarrow$ Parametrlər (`/settings`)
+- AI cavabında `type: 'link'` bloku verdikdə, `url` sahəsi bu 6 enum dəyərindən birini daşıyır:
+  ```json
+  {
+    "type": "link",
+    "label": "Skan Et səhifəsinə keç",
+    "url": "SCAN_SCREEN",
+    "content": "Sənəd yükləmək və ya skan etmək üçün Skan Et səhifəsinə keçin."
+  }
+  ```
+- **Small Chat (`chatMode: "SMALL_CHAT"`) Cavab Formatı:**
+  Small Chat düyməsi/pəncərəsi üzrə AI cavabı həm `blocks`, həm də avtomatik yönləndirmə üçün `navigation` obyektini qaytarır:
+  ```json
+  {
+    "chatMode": "SMALL_CHAT",
+    "text": "Sənəd yükləmək və ya skan etmək üçün Skan Et səhifəsinə keçin.",
+    "navigation": {
+      "targetScreen": "SCAN_SCREEN",
+      "label": "Skan Et səhifəsinə keç",
+      "route": "/scan"
+    },
+    "blocks": [
+      {
+        "type": "link",
+        "label": "Skan Et səhifəsinə keç",
+        "url": "SCAN_SCREEN",
+        "content": "Sənəd yükləmək və ya skan etmək üçün Skan Et səhifəsinə keçin."
+      }
+    ]
+  }
+  ```
+- **Frontend Tələbi:** İstifadəçi AI cavabındakı düyməyə/linkə kliki zamanı `block.url` və ya `navigation.targetScreen` / `navigation.route` dəyərini oxuyub uyğun marşruta (`/scan`, `/risks`, `/documents` və s.) keçidi təmin etməlidir.
+
 ---
 
 ## 🎯 10. Web Frontend İnteqrasiya Planı (Step-by-Step Implementation Steps)

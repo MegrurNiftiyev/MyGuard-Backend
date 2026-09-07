@@ -8,6 +8,7 @@ import {
   AttachedDocumentPayload 
 } from '../../types/index.js';
 import { getSystemPromptFor } from './prompts.js';
+import { extractNavigationMetadata } from './navigation.js';
 import { env } from '../../config/env.js';
 import { getRiskSummaryReport } from '../reports/reports.service.js';
 import { getDocumentById } from '../documents/documents.service.js';
@@ -113,7 +114,35 @@ export async function logSmallChatMessage(entry: SmallChatLogEntry) {
   }
 }
 
-export async function callLlmSmall(systemPrompt: string, message: string): Promise<string> {
+export interface SmallChatLlmResult {
+  text: string;
+  navigation?: {
+    targetScreen: ScreenDestination;
+    label: string;
+    route: string;
+  };
+  blocks?: MessageBlock[];
+}
+
+export async function callLlmSmall(systemPrompt: string, message: string): Promise<SmallChatLlmResult> {
+  const smallChatPromptHeader = `${systemPrompt}\n
+CRITICAL SMALL CHAT & NAVIGATION CONTRACT:
+- Respond in Azerbaijani concise natural text.
+- IF the user asks to navigate to a page, upload/scan files, view documents, check risk logs, or change settings:
+  1. Mention the target page clearly in text.
+  2. Include a "link" block in "blocks" array with "url" set to one of the 6 ScreenDestination Enum values: "HOME_SCREEN", "DOCUMENTS_SCREEN", "SCAN_SCREEN", "RISKS_SCREEN", "AI_SCREEN", "SETTINGS_SCREEN".
+  3. Include a "navigation" object: { "targetScreen": "ENUM", "label": "[Səhifə] səhifəsinə keç", "route": "/route" }.
+- Respond in JSON format matching schema:
+{
+  "text": "Cavab mətni...",
+  "navigation": { "targetScreen": "SCAN_SCREEN", "label": "Skan Et səhifəsinə keç", "route": "/scan" },
+  "blocks": [
+    { "type": "link", "label": "Skan Et səhifəsinə keç", "url": "SCAN_SCREEN", "content": "Sənəd yükləmək və ya skan etmək üçün Skan Et səhifəsinə keçin." }
+  ]
+}
+If no page navigation is needed, "navigation" and "blocks" can be omitted or empty.
+`;
+
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -123,8 +152,9 @@ export async function callLlmSmall(systemPrompt: string, message: string): Promi
       },
       body: JSON.stringify({
         model: env.OPENAI_MODEL || 'gpt-4o-mini',
+        response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: smallChatPromptHeader },
           { role: 'user', content: message }
         ],
         temperature: 0.7,
@@ -137,10 +167,70 @@ export async function callLlmSmall(systemPrompt: string, message: string): Promi
     }
 
     const json = await response.json();
-    return json.choices[0].message.content || 'Cavab formalaşdırıla bilmədi.';
+    const rawContent = json.choices[0]?.message?.content || '';
+
+    let parsedText = 'Cavab formalaşdırıla bilmədi.';
+    let navMetadata: SmallChatLlmResult['navigation'] = undefined;
+    let responseBlocks: MessageBlock[] = [];
+
+    try {
+      const parsed = JSON.parse(rawContent);
+      parsedText = parsed.text || parsed.reply || parsed.content || rawContent;
+      if (Array.isArray(parsed.blocks)) {
+        responseBlocks = parsed.blocks;
+      }
+      if (parsed.navigation && parsed.navigation.targetScreen) {
+        navMetadata = extractNavigationMetadata(parsed.navigation.targetScreen, parsed.navigation.label);
+      }
+    } catch {
+      parsedText = rawContent;
+    }
+
+    // Check blocks for type: 'link' if navMetadata is not yet set
+    if (!navMetadata && responseBlocks.length > 0) {
+      const linkBlock = responseBlocks.find(b => b.type === 'link' && b.url);
+      if (linkBlock) {
+        navMetadata = extractNavigationMetadata(linkBlock.url, linkBlock.label);
+      }
+    }
+
+    // Intent detection fallback from message / text if AI omitted link block
+    if (!navMetadata) {
+      const lowerMsg = (message + ' ' + parsedText).toLowerCase();
+      if (lowerMsg.includes('skan') || lowerMsg.includes('yüklə') || lowerMsg.includes('scan')) {
+        navMetadata = extractNavigationMetadata('SCAN_SCREEN');
+      } else if (lowerMsg.includes('risk') || lowerMsg.includes('blok') || lowerMsg.includes('təhlükə')) {
+        navMetadata = extractNavigationMetadata('RISKS_SCREEN');
+      } else if (lowerMsg.includes('sənəd') || lowerMsg.includes('document')) {
+        navMetadata = extractNavigationMetadata('DOCUMENTS_SCREEN');
+      } else if (lowerMsg.includes('parametr') || lowerMsg.includes('tənzimləmə') || lowerMsg.includes('setting')) {
+        navMetadata = extractNavigationMetadata('SETTINGS_SCREEN');
+      } else if (lowerMsg.includes('ana səhifə') || lowerMsg.includes('əsas səhifə') || lowerMsg.includes('home')) {
+        navMetadata = extractNavigationMetadata('HOME_SCREEN');
+      }
+    }
+
+    // Automatically ensure blocks contains the link block if navMetadata exists
+    if (navMetadata && !responseBlocks.some(b => b.type === 'link' && (b.url === navMetadata?.targetScreen || b.url === navMetadata?.route))) {
+      responseBlocks.push({
+        type: 'link',
+        label: navMetadata.label,
+        url: navMetadata.targetScreen,
+        content: parsedText
+      });
+    }
+
+    return {
+      text: parsedText,
+      navigation: navMetadata,
+      blocks: responseBlocks.length > 0 ? responseBlocks : undefined
+    };
+
   } catch (err: any) {
     console.error(`[Chat Service] Small Chat Error: ${err.message}`);
-    return 'Üzr istəyirik, təhlil zamanı xəta baş verdi və ya AI servisi əlçatmazdır.';
+    return {
+      text: 'Üzr istəyirik, təhlil zamanı xəta baş verdi və ya AI servisi əlçatmazdır.'
+    };
   }
 }
 
