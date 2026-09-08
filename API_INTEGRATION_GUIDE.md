@@ -476,6 +476,15 @@ socket.on('scan_event', (data) => {
 }
 ```
 
+### 🔹 6.2 AI Tool Calling (Token-Efficient Smart Document Query System)
+`LARGE_CHAT` rejimində AI Asistent birbaşa OpenAI-ın **Function Calling (Tool-Calling)** mexanizmi ilə bazaya qoşulur. Əsas istifadə edilən tool-lardan biri `query_user_documents`-dir.
+Bu sistemin frontend və backend üçün önəmi:
+- **Token Qənaəti (Projection):** AI məlumatı axtaranda (məsələn: "Mənə son 3 sənədmi ver") backend-dən bütün faylı deyil, yalnız ehtiyacı olan `fieldsToReturn` (məs: `id`, `fileName`) sahələrini istəyir.
+- **RegEx Axtarış:** AI sənədin adına və OCR mətninə görə birbaşa regex axtarışı (`searchQuery`) edə bilir.
+- **3-Try Limit:** Əgər AI axtardığı məlumatı ilk cəhddə tapmazsa, arxa planda istifadəçiyə heç nə bildirmədən 3 fərqli axtarış parametri ilə yenidən cəhd edir.
+- **Dərin Analiz (Recursive Lookup):** Əgər AI-a sənədin daxili lazımdırsa, əvvəlcə adı ilə axtarıb `id`-ni tapır, daha sonra ikinci tool çağırışı (`get_document_analysis`) edərək böyük OCR mətni yükləyir.
+- **Səhifəyə Yönləndirmə (Navigation Links):** AI cavabında analiz səhifələrinə dinamik linklər qaytara bilər. UI-da AI-ın qaytardığı `type: 'link'` blokları `/documents/{docId}` kimi qəbul edilib birbaşa həmin səhifəyə yönləndirməlidir.
+
 ---
 
 ## 💻 7. Standard Frontend API Service (`apiClient.ts`)

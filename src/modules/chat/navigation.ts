@@ -64,25 +64,18 @@ export function createNavigationBlock(
 }
 
 export const AI_NAVIGATION_SYSTEM_PROMPT_INSTRUCTION = `
-NAVIGATION & PAGE REDIRECTION RULE:
-You are aware of all 5 main application screens in the sidebar menu:
-1. "HOME_SCREEN" (Əsas səhifə): Executive dashboard, active threat overview, and recent scan stats.
-2. "DOCUMENTS_SCREEN" (Sənədlər): Scanned documents repository, OCR diff viewer, and clean document downloads.
-3. "SCAN_SCREEN" (Skan et): Document upload, live 7-step scanning sandbox, and immediate risk mitigation.
-4. "AI_SCREEN" (AI Assistant): Master Security Operations Center chat console.
-5. "SETTINGS_SCREEN" (Parametrlər): Confidence thresholds, security policies, and system settings.
-
-WHENEVER the user asks to perform an action (e.g. upload/scan a file, view document list, change settings, go to home page, or switch screens):
-1. Explain what page they need to visit in Azerbaijani.
-2. YOU MUST INCLUDE A NAVIGATION REDIRECT "link" BLOCK IN YOUR JSON RESPONSE:
-   {
-     "type": "link",
-     "label": "[Səhifə Adı] səhifəsinə keç",
-     "url": "TARGET_SCREEN_ENUM",
-     "content": "Açıqlama mətni..."
-   }
-   Where "url" MUST be exactly one of the enum strings: "HOME_SCREEN", "DOCUMENTS_SCREEN", "SCAN_SCREEN", "AI_SCREEN", "SETTINGS_SCREEN".
-   When the user clicks this block in the UI, the frontend will automatically navigate to that screen!
+NAVIGATION & PAGE EXPLANATION RULES:
+1. When the user asks "How do I do X?" or asks for instructions (e.g. how to scan documents, change settings, view recent documents, view all documents, open AI console), ALWAYS provide a complete, clear, step-by-step text explanation FIRST inside the response!
+2. NEVER force immediate page redirects or substitute step-by-step explanations with just a navigation button. The user expects direct answers in the chat window.
+3. Include a "link" navigation block ONLY IF:
+   a) The user explicitly asks to navigate to a screen (e.g. "skan səhifəsinə keç", "parametrləri aç").
+   b) OR as a helpful optional shortcut link at the end of your step-by-step explanation.
+4. Screen Destination Enum values mapping:
+   - "HOME_SCREEN" (Əsas səhifə - /home): Executive dashboard, active threat overview, recent scan stats.
+   - "DOCUMENTS_SCREEN" (Sənədlər - /documents): All scanned documents repository, OCR vs PDF diff viewer, clean downloads.
+   - "SCAN_SCREEN" (Skan et - /scan): Document upload, live 7-step security scanning sandbox.
+   - "AI_SCREEN" (AI Assistant - /ai-assistant): Master SOC chat console for deep analytical dialogue and file reviews.
+   - "SETTINGS_SCREEN" (Parametrlər - /settings): Security confidence thresholds, sanitizer rules, system config.
 `.trim();
 
 /**

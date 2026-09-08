@@ -11,7 +11,7 @@ import { getSystemPromptFor } from './prompts.js';
 import { extractNavigationMetadata } from './navigation.js';
 import { env } from '../../config/env.js';
 import { getRiskSummaryReport } from '../reports/reports.service.js';
-import { getDocumentById } from '../documents/documents.service.js';
+import { getDocumentById, queryUserDocuments } from '../documents/documents.service.js';
 import { classifyDocumentText } from '../analysis/fastapi.service.js';
 
 export interface ChatSession {
@@ -127,17 +127,18 @@ export interface SmallChatLlmResult {
 export async function callLlmSmall(systemPrompt: string, message: string): Promise<SmallChatLlmResult> {
   const smallChatPromptHeader = `${systemPrompt}\n
 CRITICAL SMALL CHAT & NAVIGATION CONTRACT:
-- Respond in Azerbaijani concise natural text.
-- IF the user asks to navigate to a page, upload/scan files, view documents, or change settings:
+- ALWAYS answer user questions (such as "sənədləri necə skan edim", "parametrləri necə dəyişim", "ən son sənədlərə necə baxım", "nələr edə bilərsən") with a CLEAR, ACCURATE, STEP-BY-STEP text explanation directly in Azerbaijani!
+- DO NOT force immediate page redirects or replace explanations with just a navigation button. The user expects full answers right here in the chat.
+- IF and ONLY IF the user explicitly asks to navigate to a page (e.g. "skan səhifəsinə keç", "məni parametrlərə apar") OR if an optional shortcut link at the end of the text explanation is beneficial:
   1. Mention the target page clearly in text.
   2. Include a "link" block in "blocks" array with "url" set to one of the 5 ScreenDestination Enum values: "HOME_SCREEN", "DOCUMENTS_SCREEN", "SCAN_SCREEN", "AI_SCREEN", "SETTINGS_SCREEN".
   3. Include a "navigation" object: { "targetScreen": "ENUM", "label": "[Səhifə] səhifəsinə keç", "route": "/route" }.
 - Respond in JSON format matching schema:
 {
-  "text": "Cavab mətni...",
+  "text": "Detallı addım-addım cavab mətni...",
   "navigation": { "targetScreen": "SCAN_SCREEN", "label": "Skan Et səhifəsinə keç", "route": "/scan" },
   "blocks": [
-    { "type": "link", "label": "Skan Et səhifəsinə keç", "url": "SCAN_SCREEN", "content": "Sənəd yükləmək və ya skan etmək üçün Skan Et səhifəsinə keçin." }
+    { "type": "link", "label": "Skan Et səhifəsinə keç", "url": "SCAN_SCREEN", "content": "Sənəd yükləmək və ya skan etmək üçün Skan Et səhifəsinə keçə bilərsiniz." }
   ]
 }
 If no page navigation is needed, "navigation" and "blocks" can be omitted or empty.
@@ -194,17 +195,23 @@ If no page navigation is needed, "navigation" and "blocks" can be omitted or emp
       }
     }
 
-    // Intent detection fallback from message / text if AI omitted link block
+    // Intent detection fallback ONLY when user explicitly uses navigation action verbs
     if (!navMetadata) {
-      const lowerMsg = (message + ' ' + parsedText).toLowerCase();
-      if (lowerMsg.includes('skan') || lowerMsg.includes('yüklə') || lowerMsg.includes('scan')) {
-        navMetadata = extractNavigationMetadata('SCAN_SCREEN');
-      } else if (lowerMsg.includes('sənəd') || lowerMsg.includes('document')) {
-        navMetadata = extractNavigationMetadata('DOCUMENTS_SCREEN');
-      } else if (lowerMsg.includes('parametr') || lowerMsg.includes('tənzimləmə') || lowerMsg.includes('setting')) {
-        navMetadata = extractNavigationMetadata('SETTINGS_SCREEN');
-      } else if (lowerMsg.includes('ana səhifə') || lowerMsg.includes('əsas səhifə') || lowerMsg.includes('home')) {
-        navMetadata = extractNavigationMetadata('HOME_SCREEN');
+      const lowerUserMsg = message.toLowerCase();
+      const isExplicitNavRequest = /keç|aç|yönləndir|apar|gedim|getmək|keçmək|baxmaq\s+istəyirəm/i.test(lowerUserMsg);
+      
+      if (isExplicitNavRequest) {
+        if (lowerUserMsg.includes('skan') || lowerUserMsg.includes('yüklə') || lowerUserMsg.includes('scan')) {
+          navMetadata = extractNavigationMetadata('SCAN_SCREEN');
+        } else if (lowerUserMsg.includes('sənəd') || lowerUserMsg.includes('document')) {
+          navMetadata = extractNavigationMetadata('DOCUMENTS_SCREEN');
+        } else if (lowerUserMsg.includes('parametr') || lowerUserMsg.includes('tənzimləmə') || lowerUserMsg.includes('setting')) {
+          navMetadata = extractNavigationMetadata('SETTINGS_SCREEN');
+        } else if (lowerUserMsg.includes('ana səhifə') || lowerUserMsg.includes('əsas səhifə') || lowerUserMsg.includes('home')) {
+          navMetadata = extractNavigationMetadata('HOME_SCREEN');
+        } else if (lowerUserMsg.includes('ai') || lowerUserMsg.includes('assistant') || lowerUserMsg.includes('konsol')) {
+          navMetadata = extractNavigationMetadata('AI_SCREEN');
+        }
       }
     }
 
@@ -349,12 +356,48 @@ ${rawText}
           required: ["documentId"]
         }
       }
+    },
+    {
+      type: "function",
+      function: {
+        name: "query_user_documents",
+        description: "Query and filter user documents. Use this when the user asks about specific files, searches for content, or asks for recent scans. Returns only the requested fields to save tokens.",
+        parameters: {
+          type: "object",
+          properties: {
+            limit: { type: "number", description: "Maximum number of documents to return." },
+            hasInjection: { type: "boolean", description: "Filter by prompt injection presence." },
+            riskStatus: { type: "string", description: "Filter by risk status (e.g., 'safe', 'suspicious', 'high_risk', 'blocked')." },
+            fileType: { type: "string", description: "Filter by file extension (e.g., 'pdf', 'docx')." },
+            searchQuery: { type: "string", description: "Regex or keyword to search in fileName and ocrText." },
+            documentId: { type: "string", description: "Exact ID of the document to retrieve." },
+            startDate: { type: "string", description: "ISO date string to filter documents uploaded after this date." },
+            endDate: { type: "string", description: "ISO date string to filter documents uploaded before this date." },
+            minRiskScore: { type: "number", description: "Minimum risk score (0-100)." },
+            maxRiskScore: { type: "number", description: "Maximum risk score (0-100)." },
+            isConfidential: { type: "boolean", description: "Filter by confidentiality status." },
+            sortOrder: { type: "string", enum: ["asc", "desc"], description: "Sort documents by upload date. Defaults to desc." },
+            fieldsToReturn: { 
+              type: "array", 
+              items: { type: "string" },
+              description: "Array of specific fields to return (e.g. ['id', 'fileName', 'finalRiskScore', 'layer3_llmReview.explanation']). Only ask for heavy fields like 'layer1_ocrTextMatch.ocrText' if specifically needed!"
+            }
+          }
+        }
+      }
     }
   ];
 
   const fullSystemPrompt = `${systemPrompt}${docContextPrompt}
 You are MyGuard AI Security Assistant. The user is currently viewing the ${screenDestination || 'CURRENT'} screen.
 Answer user questions clearly, accurately, and concisely.
+
+CRITICAL RULE FOR QUERYING DOCUMENTS:
+- When a user asks about their files (e.g., "what are my recent files?", "search for invoice", "show me files with injections"), ALWAYS use the \`query_user_documents\` tool.
+- TOKEN CONSERVATION: When using \`query_user_documents\`, ALWAYS use the \`fieldsToReturn\` parameter to fetch ONLY the fields you need. For example, if the user just wants a list of recent files, request \`['id', 'fileName', 'uploadedAt', 'finalRiskScore']\`. DO NOT request heavy fields like \`layer1_ocrTextMatch.ocrText\` unless the user explicitly asks for the document's content.
+- 3-TRY LIMIT: You have up to 3 attempts to call tools per response. If your first query doesn't find the result, you can automatically try another tool call with different parameters. If you still can't find it after 3 tries, inform the user you couldn't find the data.
+- RECURSIVE SEARCH: If you need to deep dive into a specific file, you can first query it by name (returning \`id\`, \`fileName\`), and then make a follow-up tool call to \`get_document_analysis\` using that \`id\`.
+- LINKING: Whenever you present a document, you can create a link for the user to view its analysis page using the format \`/documents/{id}\`. For example: \`{ "type": "link", "url": "/documents/" + doc.id, "label": "Bax: " + doc.fileName, "content": "..." }\`.
 
 CRITICAL RULE FOR RISK STATS, SCAN RESULTS & DASHBOARDS:
 - NEVER invent, fabricate, or use template/hardcoded numbers when asked about scan results, total documents, risk status, or injection counts.
@@ -465,6 +508,9 @@ Do NOT use Markdown outside of text blocks. Only return a valid JSON object matc
                 untrusted_content: `<untrusted_document_context>${doc.layer1_ocrTextMatch?.ocrText || ''}</untrusted_document_context>`
               });
             }
+          } else if (functionName === 'query_user_documents') {
+            const results = await queryUserDocuments(userId, args);
+            toolResultStr = JSON.stringify(results);
           }
 
           messages.push({

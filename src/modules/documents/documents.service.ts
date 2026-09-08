@@ -496,6 +496,112 @@ export async function getUserFullDocuments(userId?: string): Promise<Document[]>
   }));
 }
 
+export interface QueryFilters {
+  limit?: number;
+  hasInjection?: boolean;
+  riskStatus?: string;
+  fileType?: string;
+  startDate?: string;
+  endDate?: string;
+  searchQuery?: string;
+  documentId?: string;
+  minRiskScore?: number;
+  maxRiskScore?: number;
+  isConfidential?: boolean;
+  sortOrder?: 'asc' | 'desc';
+  fieldsToReturn?: string[];
+}
+
+export async function queryUserDocuments(userId: string, filters: QueryFilters): Promise<Partial<Document>[]> {
+  const allDocs = await getUserFullDocuments(userId);
+  let filtered = allDocs;
+
+  if (filters.documentId) {
+    filtered = filtered.filter(d => d.id === filters.documentId);
+  }
+
+  if (filters.hasInjection !== undefined) {
+    filtered = filtered.filter(d => d.isContainInjection === filters.hasInjection);
+  }
+  if (filters.riskStatus) {
+    filtered = filtered.filter(d => d.finalStatus === filters.riskStatus);
+  }
+  if (filters.fileType) {
+    filtered = filtered.filter(d => d.fileType?.toLowerCase() === filters.fileType?.toLowerCase());
+  }
+  if (filters.startDate) {
+    const start = new Date(filters.startDate).getTime();
+    if (!isNaN(start)) {
+      filtered = filtered.filter(d => new Date(d.uploadedAt).getTime() >= start);
+    }
+  }
+  if (filters.endDate) {
+    const end = new Date(filters.endDate).getTime();
+    if (!isNaN(end)) {
+      filtered = filtered.filter(d => new Date(d.uploadedAt).getTime() <= end);
+    }
+  }
+  if (filters.searchQuery) {
+    try {
+      const regex = new RegExp(filters.searchQuery, 'i');
+      filtered = filtered.filter(d => 
+        regex.test(d.fileName) || 
+        (d.layer1_ocrTextMatch?.ocrText && regex.test(d.layer1_ocrTextMatch.ocrText))
+      );
+    } catch (e) {
+      // Fallback to basic string includes if regex is invalid
+      const lowerQuery = filters.searchQuery.toLowerCase();
+      filtered = filtered.filter(d => 
+        d.fileName.toLowerCase().includes(lowerQuery) ||
+        (d.layer1_ocrTextMatch?.ocrText && d.layer1_ocrTextMatch.ocrText.toLowerCase().includes(lowerQuery))
+      );
+    }
+  }
+
+  if (filters.minRiskScore !== undefined) {
+    filtered = filtered.filter(d => (d.finalRiskScore ?? 0) >= filters.minRiskScore!);
+  }
+  if (filters.maxRiskScore !== undefined) {
+    filtered = filtered.filter(d => (d.finalRiskScore ?? 0) <= filters.maxRiskScore!);
+  }
+  if (filters.isConfidential !== undefined) {
+    filtered = filtered.filter(d => Boolean(d.isConfidential) === filters.isConfidential);
+  }
+
+  // Sort
+  if (filters.sortOrder === 'asc') {
+    filtered.sort((a, b) => new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime());
+  } else {
+    // desc by default
+    filtered.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+  }
+
+  if (filters.limit && filters.limit > 0) {
+    filtered = filtered.slice(0, filters.limit);
+  }
+
+  // Projection mapping
+  if (filters.fieldsToReturn && filters.fieldsToReturn.length > 0) {
+    return filtered.map(d => {
+      const projected: any = {};
+      for (const field of filters.fieldsToReturn!) {
+        if (field.includes('.')) {
+          const parts = field.split('.');
+          if (parts.length === 2) {
+             projected[parts[0]] = projected[parts[0]] || {};
+             projected[parts[0]][parts[1]] = (d as any)[parts[0]]?.[parts[1]];
+          }
+        } else {
+          projected[field] = (d as any)[field];
+        }
+      }
+      return projected;
+    });
+  }
+
+  return filtered;
+}
+
 export async function getDocumentById(docId: string): Promise<Document | undefined> {
   let foundDoc: Document | undefined;
 
