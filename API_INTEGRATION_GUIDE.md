@@ -532,6 +532,24 @@ AI Asistent modelinin backend tərəfində JSON formalı cavablar verməsi və e
 - **`SETTINGS_SCREEN`**: Platform konfiqurasiyalarına və threshold tənzimləmələrinə fokuslanır.
 - **`AI_SCREEN`**: Master Security Operations Center rejimidir — tam analitik hesabatlar və qrafiklər generasiya edilir.
 
+### 🔹 8.3 AI UI Bloklarının Ciddi Düzülüş Sırası Və Miqdar Qaydaları
+AI cavab generasiya edərkən aşağıdakı 3 məcburi dizayn və məntiq qaydasına riayət edir:
+
+1. **Qısa Və Sadə Sorğularda Çoxlu Blok Generasiya Etməmək (Max 1-2 Blok):**
+   - İstifadəçi qısa sorğu yazdıqda (məs: *"Salam"*, *"Bu nədir?"*, *"Sənədlərimi göstər"*), AI lüzumsuz olaraq 4-5 müxtəlif blok (saxta cədvəl, qrafik, kod) **generasiya etmir**.
+   - Yalnız 1 `header` və 1 `text` (və ya `callout`) bloku ilə ən qısa və dəqiq cavab qaytarılır.
+2. **Ciddi Blok Düzülüş Sırası (UI Layout Priority):**
+   - Çoxlu blok verildikdə bloklar mütləq yuxarıdan aşağıya doğru aşağıdakı ciddi sıralama ilə verilə bilər:
+     1. **`header`**: Cavabın əsas başlığı (hər zaman ən birinci gəlir).
+     2. **`text` / `callout`**: Əsas izah mətni və ya xəbərdarlıq qutusu.
+     3. **`table`**: Sənəd/risk siyahısı və məlumat cədvəli (yalnız soruşulduqda və ya ciddi müqayisə lazım olduqda).
+     4. **`chart`**: Vizual dinamika və ya statistika qrafiki (yalnız statistik tələb olduqda).
+     5. **`link` / `file`**: Yükləmə keçidləri və ya səhifə yönləndirmə düymələri (hər zaman ən aşağıda yerləşir).
+   - *Cədvəl və ya Qrafik heç bir zaman Giriş Mətnindən və ya Başlıqdan əvvəl gələ bilməz!*
+3. **Məlumat Olmayan Və Ya Lazımsız Blokların Tam Qapadılması (Omit Empty Blocks):**
+   - Əgər sənəddə təhlükə yoxdursa, saxta xəbərdarlıq və ya təhdid cədvəli çıxarılmır.
+   - Əgər yükləmə linki soruşulmayıbsa və ya mövcud deyilsə, `link` bloku ümumiyyətlə cavaba əlavə edilmir (tamamilə omit edilir).
+
 ---
 
 ## 🚀 9. Post-Audit Yenilikləri Və İnteqrasiya Tələbləri (Avqust 2026)
@@ -548,11 +566,13 @@ Audit sonrası arxitekturaya aşağıdakı inteqrasiya və təhlükəsizlik yeni
 - Yalnız `.env`-də `USE_MOCK_LAYER2=true` quraşdırıldıqda mock işləyir. Əks halda xəta aşkar şəkildə frontend-ə ötürülür və `stepStatus: 'error'` olaraq, `errorDetail: 'FastAPI classifier unavailable'` formunda Socket ilə bildirilir.
 - Daxili xidmətlər arası `X-Internal-Token` üçün təkrar yoxlama (1 retry, 10s timeout) məntiqi saxlanılmışdır.
 
-### 🔹 9.3 LARGE_CHAT Və OpenAI Tool-Calling
-- `chatMode: 'LARGE_CHAT'` rejimi artıq birbaşa OpenAI (`gpt-4o-mini`) ilə idarə olunur və **Tool-Calling (Function Calling)** vasitəsilə canlı məlumat çəkir.
-- Hazırkı inteqrasiya edilmiş Tool-lar:
-  - `get_risk_summary`: Canlı Risk xülasəsini çəkir (`Dashboard` üçün).
-  - `get_document_analysis`: Seçilmiş Document ID üzrə OCR və PDF fərqliliklərini oxuyur.
+### 🔹 9.3 LARGE_CHAT Və OpenAI Tool-Calling (`query_user_documents`)
+- `chatMode: 'LARGE_CHAT'` rejimi birbaşa OpenAI (`gpt-4o-mini`) ilə idarə olunur və **Tool-Calling (Function Calling)** vasitəsilə istifadəçinin sənədlərini dinamik sorğulayır.
+- Maksimum 3 dəfə dalbadal sorğu yollamaq (auto-loop execution) icazəsi verilib.
+- **İnteqrasiya edilmiş Tool-lar:**
+  1. `get_risk_summary`: Canlı Risk xülasəsini çəkir (`Dashboard` üçün).
+  2. `get_document_analysis`: Seçilmiş Document ID üzrə OCR və PDF fərqliliklərini oxuyur.
+  3. `query_user_documents`: İstifadəçinin sənədlərini REGEX, ID, tarix, status və risk balı üzrə axtarır. Token qənaəti üçün `fieldsToReturn` projeksiyasını dəstəkləyir (məs: `['id', 'fileName', 'uploadUrl']`).
 
 ### 🔹 9.4 `isContainInjection` Sahəsinin Dinamikləşdirilməsi
 - Məlumat bazasına statik olaraq yazılmır. 
