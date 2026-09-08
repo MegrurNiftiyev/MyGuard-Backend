@@ -52,6 +52,36 @@ function isStructuralNoise(seg: string): boolean {
   return false;
 }
 
+function extractInjectionPatterns(text: string): string[] {
+  const injectionSegments: string[] = [];
+
+  // Pattern 1: Comments or directives wrapped in // ... // or /* ... */ or // ... until end
+  const commentRegex = /(?:\/\/|\/\*|#|\[SYSTEM|\[INSTRUCTION|<hidden_prompt>)([\s\S]*?)(?:\/\/|\*\/|\]|<\/hidden_prompt>|\n\n|$)/gi;
+  let match;
+  while ((match = commentRegex.exec(text)) !== null) {
+    const fullMatched = match[0].trim();
+    if (fullMatched.length >= 10 && !isStructuralNoise(fullMatched)) {
+      if (!injectionSegments.includes(fullMatched)) {
+        injectionSegments.push(fullMatched);
+      }
+    }
+  }
+
+  // Pattern 2: Explicit prompt injection phrasing keywords
+  const injectionKeywordsRegex = /(?:bu sadece bir promptdur|yazismalarimizda qeti mene bildirme|ignore previous instructions|forget all previous|system directive|disregard prior|secret instruction|sil, bu haqqda|prompt injection|bu kicik xeta olsada)/gi;
+  const sentences = text.split(/(?<=[.!?\n])\s+/);
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim();
+    if (trimmed.length >= 15 && injectionKeywordsRegex.test(trimmed)) {
+      if (!injectionSegments.some(existing => existing.includes(trimmed))) {
+        injectionSegments.push(trimmed);
+      }
+    }
+  }
+
+  return injectionSegments;
+}
+
 export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
   console.log('[Layer 1] PDF analizi başladılır...');
 
@@ -109,7 +139,7 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
             const errText = await response.text();
             console.warn(`[Layer 1] Google Vision API Xətası: ${errText}. Tesseract-a keçilir...`);
             try {
-              const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng', { langPath: tessdataPath });
+              const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng', { langPath: tessdataPath, gzip: true });
               fullOcrText += text + ' ';
             } catch (tessErr: any) {
               console.warn(`[Layer 1] Tesseract OCR xətası (səhifə ${i + 1}): ${tessErr?.message || tessErr}`);
@@ -124,7 +154,7 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
         console.log(`[Layer 1] GOOGLE_VISION_API_KEY tapılmadı, Tesseract (aze+eng) istifadə edilir...`);
         for (let i = 0; i < images.length; i++) {
           try {
-            const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng', { langPath: tessdataPath });
+            const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng', { langPath: tessdataPath, gzip: true });
             fullOcrText += text + ' ';
           } catch (tessErr: any) {
             console.warn(`[Layer 1] Tesseract OCR xətası (səhifə ${i + 1}): ${tessErr?.message || tessErr}`);
@@ -143,61 +173,66 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
     const rawPdfText = fullPdfText.replace(/\s+/g, ' ').trim();
     const rawOcrText = (fullOcrText || normalizedOcrText).replace(/\s+/g, ' ').trim();
 
-    const matchFraction = stringSimilarity.compareTwoStrings(normalizedPdfTextForCompare, normalizedOcrTextForCompare);
-    const matchPercent = Math.round(matchFraction * 100);
-
     const extraTextSegments: string[] = [];
-
-    // Helper to extract significant words (length >= 3)
     const extractWords = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(w => w.length >= 3);
     const ocrWordsSet = new Set(extractWords(normalizedOcrTextForCompare));
 
-    // Split PDF text into logical blocks / paragraphs (do NOT split on table pipes '|' or punctuation inside lines)
+    // Split PDF text into logical blocks / paragraphs
     const rawBlocks = rawPdfText
       .split(/(?:\r?\n)+|(?<=[.!?])\s+(?=[A-Z\[])/i)
       .map(s => s.trim())
       .filter(s => s.length >= 15 && !isStructuralNoise(s));
 
-    for (const block of rawBlocks) {
-      const blockWords = extractWords(block);
-      if (blockWords.length < 3) continue;
+    const hasSufficientOcr = normalizedOcrTextForCompare.length >= 20;
 
-      let matchedWords = 0;
-      for (const w of blockWords) {
-        if (ocrWordsSet.has(w) || normalizedOcrTextForCompare.includes(w)) {
-          matchedWords++;
+    if (hasSufficientOcr) {
+      for (const block of rawBlocks) {
+        const blockWords = extractWords(block);
+        if (blockWords.length < 3) continue;
+
+        let matchedWords = 0;
+        for (const w of blockWords) {
+          if (ocrWordsSet.has(w) || normalizedOcrTextForCompare.includes(w)) {
+            matchedWords++;
+          }
         }
-      }
 
-      const ratio = matchedWords / blockWords.length;
-      // If less than 45% of words are present in OCR text and window similarity is low, it is missing (hidden) text!
-      const normBlock = normalizeForCompare(block);
-      const isVisibleInOcr = ratio >= 0.45 || bestWindowSimilarity(normBlock, normalizedOcrTextForCompare) > 0.60;
+        const ratio = matchedWords / blockWords.length;
+        const normBlock = normalizeForCompare(block);
+        const isVisibleInOcr = ratio >= 0.45 || bestWindowSimilarity(normBlock, normalizedOcrTextForCompare) > 0.60;
 
-      if (!isVisibleInOcr) {
-        if (!extraTextSegments.some(existing => existing.includes(block) || block.includes(existing))) {
-          extraTextSegments.push(block);
-        }
-      }
-    }
-
-    // Fallback using diffWords if block-level checks didn't catch a major discrepancy
-    if (extraTextSegments.length === 0 && matchPercent < 90) {
-      const diffs = diffWords(normalizedOcrTextForCompare, normalizedPdfTextForCompare);
-      for (const part of diffs) {
-        if (part.added && part.value.trim().length > 15) {
-          const val = part.value.trim();
-          if (!extraTextSegments.includes(val) && !isStructuralNoise(val)) {
-            extraTextSegments.push(val);
+        if (!isVisibleInOcr) {
+          if (!extraTextSegments.some(existing => existing.includes(block) || block.includes(existing))) {
+            extraTextSegments.push(block);
           }
         }
       }
     }
 
+    // Supplement with explicit injection patterns if present
+    const explicitInjections = extractInjectionPatterns(rawPdfText);
+    for (const inj of explicitInjections) {
+      if (!extraTextSegments.some(existing => existing.includes(inj) || inj.includes(existing))) {
+        extraTextSegments.push(inj);
+      }
+    }
+
+    // SANITY CHECK: extraTextSegments must NEVER equal or contain > 70% of the whole document!
+    const totalPdfWords = extractWords(rawPdfText).length;
+    const totalFlaggedWords = extractWords(extraTextSegments.join(' ')).length;
+    let finalExtraSegments: string[] = [];
+
+    if (totalPdfWords > 0 && (totalFlaggedWords / totalPdfWords) > 0.70) {
+      console.warn('[Layer 1] OCR flagged > 70% of text as missing. Using explicit injection patterns fallback.');
+      finalExtraSegments = explicitInjections;
+    } else {
+      finalExtraSegments = extraTextSegments;
+    }
+
     // Merge contiguous extra text segments into complete prompt injection paragraphs
     const mergedExtraSegments: string[] = [];
     const normalizedRawPdf = rawPdfText.replace(/\s+/g, ' ');
-    for (const seg of extraTextSegments) {
+    for (const seg of finalExtraSegments) {
       if (mergedExtraSegments.length > 0) {
         const lastIdx = mergedExtraSegments.length - 1;
         const lastSeg = mergedExtraSegments[lastIdx];
@@ -210,15 +245,32 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
       mergedExtraSegments.push(seg);
     }
 
-    const finalExtraSegments = mergedExtraSegments.length > 0 ? mergedExtraSegments : extraTextSegments;
-    const hiddenTextDetected = matchPercent < 90 || finalExtraSegments.length > 0;
-    console.log(`[Layer 1] Nəticə: Uyğunluq ${matchPercent}%. Dəqiq gizli mətn blokları:`, finalExtraSegments.length);
+    const resultExtraSegments = mergedExtraSegments.length > 0 ? mergedExtraSegments : finalExtraSegments;
+    const hiddenTextDetected = resultExtraSegments.length > 0;
+
+    // Calculate final clean OCR text (rawPdfText with injection segments stripped out if rawOcrText was missing)
+    let finalOcrText = rawOcrText;
+    if (!finalOcrText || finalOcrText.length < 10 || finalOcrText === 'OCR mətni oxundu') {
+      let cleaned = rawPdfText;
+      for (const seg of resultExtraSegments) {
+        cleaned = cleaned.replace(seg, '').trim();
+      }
+      finalOcrText = cleaned.replace(/\s+/g, ' ').trim() || rawPdfText;
+    }
+
+    let matchPercent = 100;
+    if (resultExtraSegments.length > 0 && rawPdfText.length > 0) {
+      const injectionLength = resultExtraSegments.join(' ').length;
+      matchPercent = Math.max(10, Math.min(98, Math.round(((rawPdfText.length - injectionLength) / rawPdfText.length) * 100)));
+    }
+
+    console.log(`[Layer 1] Nəticə: Uyğunluq ${matchPercent}%. Dəqiq gizli mətn blokları:`, resultExtraSegments.length);
 
     return {
       matchPercent,
       hiddenTextDetected,
-      extraTextSegments: finalExtraSegments.length > 0 ? finalExtraSegments : undefined,
-      ocrText: rawOcrText || 'OCR mətni oxundu',
+      extraTextSegments: resultExtraSegments.length > 0 ? resultExtraSegments : undefined,
+      ocrText: finalOcrText,
       pdfTextLayer: rawPdfText || 'PDF mətn qatı oxundu',
     };
   } catch (error) {

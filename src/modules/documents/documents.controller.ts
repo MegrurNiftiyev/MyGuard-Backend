@@ -67,16 +67,20 @@ export async function getDocumentComparison(req: AuthenticatedRequest, res: Resp
     throw new AppError(translate('doc_not_found', lang), 404);
   }
 
+  const match = document.layer1_ocrTextMatch;
+  const flaggedSnippets = match?.differenceSnippets?.length ? match.differenceSnippets : (match?.extraTextSegments || []);
+  const flaggedSnippet = match?.differenceSnippet || flaggedSnippets.join('\n\n') || '';
+
   res.json({
     documentId: docId,
     documentName: document.fileName,
-    ocrText: document.layer1_ocrTextMatch?.ocrText || translate('no_data', lang),
-    pdfTextLayer: document.layer1_ocrTextMatch?.pdfTextLayer || translate('no_data', lang),
-    ocrPdfMatch: document.layer1_ocrTextMatch?.matchPercent || 100,
-    hiddenTextDetected: document.layer1_ocrTextMatch?.hiddenTextDetected || false,
-    textDifferenceFound: document.layer1_ocrTextMatch?.textDifferenceFound || false,
-    flaggedSnippet: document.layer1_ocrTextMatch?.differenceSnippet || (document.layer1_ocrTextMatch?.extraTextSegments || []).join('\n\n') || '',
-    flaggedSnippets: document.layer1_ocrTextMatch?.differenceSnippets || document.layer1_ocrTextMatch?.extraTextSegments || [],
+    ocrText: match?.ocrText || match?.pdfTextLayer || translate('no_data', lang),
+    pdfTextLayer: match?.pdfTextLayer || translate('no_data', lang),
+    ocrPdfMatch: match?.matchPercent ?? 100,
+    hiddenTextDetected: match?.hiddenTextDetected || false,
+    textDifferenceFound: match?.textDifferenceFound || false,
+    flaggedSnippet,
+    flaggedSnippets,
     flaggedMetadata: {
       pageNumber: 1,
       visibilityType: 'PDF Layer Only',
