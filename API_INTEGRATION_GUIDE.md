@@ -550,6 +550,42 @@ AI cavab generasiya edərkən aşağıdakı 3 məcburi dizayn və məntiq qaydas
    - Əgər sənəddə təhlükə yoxdursa, saxta xəbərdarlıq və ya təhdid cədvəli çıxarılmır.
    - Əgər yükləmə linki soruşulmayıbsa və ya mövcud deyilsə, `link` bloku ümumiyyətlə cavaba əlavə edilmir (tamamilə omit edilir).
 
+### 🔹 8.4 Sənəd Keçidləri, Yükləmə Linkləri Və Fayl Bloklarının İnteqrasiyası
+İstifadəçi AI Asistentdən sənədin linkini, endirmə keçidini və ya konkret fayla bərabər baxış istədikdə, AI cavab JSON-da aşağıdakı blok strukturunu qaytarır:
+
+#### A. `type: 'file'` Bloku (Bütöv Fayl Vidgeti Və Yükləmə Düyməsi)
+Faylın adı, həcmi və birbaşa Firebase Storage endirmə linki daşıyır:
+```json
+{
+  "type": "file",
+  "name": "injection_iclas_007.pdf",
+  "sizeLabel": "1.2 MB",
+  "url": "https://firebasestorage.googleapis.com/v0/b/mygurad.appspot.com/o/documents%2Fdoc-178775.pdf?alt=media"
+}
+```
+- **Frontend İşlənməsi:** UI-da fayl kartı göstərilir. İstifadəçi karta kliklədikdə faylı birbaşa BRAUZERDƏ ENDİRİR və ya popup-da açır.
+
+#### B. `type: 'link'` Bloku (Keçidlər Və Sənəd Yükləmə Linkləri)
+`type: 'link'` iki fərqli məqsədlə işlədilir:
+1. **Fayl Endirmə Linki kimi (`url` fiziki URL olduqda):**
+   ```json
+   {
+     "type": "link",
+     "label": "📥 Sənədi Endir (injection_iclas_007.pdf)",
+     "url": "https://firebasestorage.googleapis.com/v0/b/mygurad.appspot.com/o/documents%2Fdoc-178775.pdf?alt=media",
+     "content": "Axtardığınız sənədi birbaşa yükləmək üçün aşağıdakı düyməyə sıxın."
+   }
+   ```
+2. **Səhifə Yönləndirmə Linki kimi (`url` Screen Destination Enum olduqda):**
+   ```json
+   {
+     "type": "link",
+     "label": "Sənədlər səhifəsinə keç",
+     "url": "DOCUMENTS_SCREEN",
+     "content": "Bütün sənədlərinizi idarə etmək üçün Sənədlər bölməsinə keçin."
+   }
+   ```
+
 ---
 
 ## 🚀 9. Post-Audit Yenilikləri Və İnteqrasiya Tələbləri (Avqust 2026)
@@ -568,11 +604,36 @@ Audit sonrası arxitekturaya aşağıdakı inteqrasiya və təhlükəsizlik yeni
 
 ### 🔹 9.3 LARGE_CHAT Və OpenAI Tool-Calling (`query_user_documents`)
 - `chatMode: 'LARGE_CHAT'` rejimi birbaşa OpenAI (`gpt-4o-mini`) ilə idarə olunur və **Tool-Calling (Function Calling)** vasitəsilə istifadəçinin sənədlərini dinamik sorğulayır.
+- AI yalnız cari daxil olmuş istifadəçinin sənədlərini sorğulaya bilər (User Isolation).
 - Maksimum 3 dəfə dalbadal sorğu yollamaq (auto-loop execution) icazəsi verilib.
 - **İnteqrasiya edilmiş Tool-lar:**
   1. `get_risk_summary`: Canlı Risk xülasəsini çəkir (`Dashboard` üçün).
   2. `get_document_analysis`: Seçilmiş Document ID üzrə OCR və PDF fərqliliklərini oxuyur.
   3. `query_user_documents`: İstifadəçinin sənədlərini REGEX, ID, tarix, status və risk balı üzrə axtarır. Token qənaəti üçün `fieldsToReturn` projeksiyasını dəstəkləyir (məs: `['id', 'fileName', 'uploadUrl']`).
+
+#### 🛠️ `query_user_documents` Tool-unun Dərindən Parametrləri Və Qaydaları:
+AI istifadəçinin "son yüklənən sənədlər", "invoice faylı", "maaş haqqında sənədin linki", "riskli sənədlər" kimi sorğularını dərhal `query_user_documents` çağıraraq emal edir.
+
+| Parametr | Tip | Təsvir / İstifadə Qaydası |
+| :--- | :--- | :--- |
+| `documentId` | `string` | Konkret 1 sənədin ID-si üzrə dəqiq axtarış (məs: `"doc-1787753837283-457"`). |
+| `searchQuery` | `string` | **REGEX DƏSTƏKLİ AXTARIŞ!** Həm `fileName` (fayl adı), həm də `layer1_ocrTextMatch.ocrText` (OCR daxili mətni) üzrə axtarır. Məsələn: `"invoice\|faktura"`, `"maaş"`, `"protokol"`. |
+| `limit` | `number` | Qaytarılacaq maksimum sənəd sayı (Standart: 5). Token qənaəti üçün tənzimlənir. |
+| `hasInjection` | `boolean` | `true` olduqda yalnız Prompt Injection aşkar edilən sənədləri gətirir. |
+| `riskStatus` | `string` | Status filtri: `'safe'`, `'suspicious'`, `'high_risk'`, `'blocked'`. |
+| `fileType` | `string` | Fayl genişlənməsi filtri: `'pdf'`, `'docx'`, `'txt'`, `'pptx'`. |
+| `minRiskScore` / `maxRiskScore` | `number` | Risk balı aralığı (0-100). Məsələn `minRiskScore: 80`. |
+| `startDate` / `endDate` | `string` | Yüklənmə tarixi süzgəci (ISO 8601 formatında). |
+| `isConfidential` | `boolean` | Məxfi rejimdə yüklənmiş sənədləri filtrləyir. |
+| `sortOrder` | `string` | `'desc'` (ən yeni yüklənənlər birinci) və ya `'asc'`. |
+| `fieldsToReturn` | `string[]` | **TOKEN QƏNAƏTİ ÜÇÜN ƏN VACİB PARAMETR!** Yalnız lazım olan sahələr tələb olunur: `['id', 'fileName', 'uploadUrl', 'uploadedAt', 'finalRiskScore', 'finalStatus', 'isContainInjection', 'fileType', 'isConfidential']`. |
+
+#### 🔁 Sorğu Dövrəsi Və Auto-Fallback Məntiqi (Maksimum 3 Çəhd):
+1. **1-ci Çəhd:** AI istifadəçinin sorğusuna uyğun ilk sorğunu göndərir (məs: `searchQuery: "maaş"`, `fieldsToReturn: ["id", "fileName", "uploadUrl"]`).
+2. **2-ci Çəhd (Genişləndirilmiş Axtarış):** Əgər ilk sorğuda dərhal nəticə tapılmazsa, AI avtomatik REGEX axtarışını genişləndirir və ya daha ümumi filtrlərlə 2-ci sorğunu göndərir.
+3. **3-cü Çəhd Və Ya Yekun Cavab:** Əgər maksimum 3 çəhdin sonunda da məlumat bazasında uyğun sənəd tapılmazsa, AI sorğu dövrəsini dayandırır və istifadəçiyə dürüst şəkildə *"Sənədləriniz arasında axtarışa uyğun fayl və ya yükləmə linki tapılmadı"* mesajını qaytarır. AI saxta və ya uydurma ID/link GENERASİYA ETMİR!
+
+---
 
 ### 🔹 9.4 `isContainInjection` Sahəsinin Dinamikləşdirilməsi
 - Məlumat bazasına statik olaraq yazılmır. 
