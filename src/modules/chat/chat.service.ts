@@ -124,24 +124,49 @@ export interface SmallChatLlmResult {
   blocks?: MessageBlock[];
 }
 
-export async function callLlmSmall(systemPrompt: string, message: string): Promise<SmallChatLlmResult> {
-  const smallChatPromptHeader = `${systemPrompt}\n
-CRITICAL SMALL CHAT & NAVIGATION CONTRACT:
-- ALWAYS answer user questions (such as "sənədləri necə skan edim", "parametrləri necə dəyişim", "ən son sənədlərə necə baxım", "nələr edə bilərsən") with a CLEAR, ACCURATE, STEP-BY-STEP text explanation directly in Azerbaijani!
-- DO NOT force immediate page redirects or replace explanations with just a navigation button. The user expects full answers right here in the chat.
-- IF and ONLY IF the user explicitly asks to navigate to a page (e.g. "skan səhifəsinə keç", "məni parametrlərə apar") OR if an optional shortcut link at the end of the text explanation is beneficial:
-  1. Mention the target page clearly in text.
-  2. Include a "link" block in "blocks" array with "url" set to one of the 5 ScreenDestination Enum values: "HOME_SCREEN", "DOCUMENTS_SCREEN", "SCAN_SCREEN", "AI_SCREEN", "SETTINGS_SCREEN".
-  3. Include a "navigation" object: { "targetScreen": "ENUM", "label": "[Səhifə] səhifəsinə keç", "route": "/route" }.
-- Respond in JSON format matching schema:
+export async function callLlmSmall(systemPrompt: string, message: string, userId: string = 'dev-user-123'): Promise<SmallChatLlmResult> {
+  let liveContextPrompt = '';
+  try {
+    const summary = await getRiskSummaryReport(userId);
+    const recentDocsStr = summary.documentsSummary && summary.documentsSummary.length > 0
+      ? summary.documentsSummary.slice(0, 5).map(d => `- Fayl: **${d.fileName}** | Status: **${d.finalStatus}** | Risk Balı: **${d.finalRiskScore}/100** | Injection: **${d.isContainInjection ? 'VAR' : 'YOXDUR'}** | Yüklənmə Vaxtı: ${d.uploadedAt}`).join('\n')
+      : 'Hələ ki sənəd yüklənməyib.';
+
+    liveContextPrompt = `
+LIVE SYSTEM AND DOCUMENTS CONTEXT:
+- Total Scanned Documents: ${summary.totalScanned}
+- Safe Documents: ${summary.safeCount}
+- Suspicious Documents: ${summary.suspiciousCount}
+- High Risk / Blocked Documents: ${summary.blockedCount}
+- Prompt Injections Detected: ${summary.detectedInjectionsCount}
+
+[RECENT 5 UPLOADED DOCUMENTS]
+${recentDocsStr}
+`;
+  } catch (err) {
+    console.warn('[Chat Service] Small Chat Live Context fetch failed:', err);
+  }
+
+  const smallChatPromptHeader = `${systemPrompt}
+${liveContextPrompt}
+
+SMALL CHAT CONTRACT AND FORMATTING RULES:
+1. Answer user questions directly using the live database stats provided above.
+2. FORMAT RESPONSE IN PURE TEXT / MARKDOWN ONLY. Do NOT output large table or chart blocks.
+3. Use **bold** text (e.g. **High Risk (88/100)**, **maliyye_hesabati.pdf**, **14 sənəd**) to emphasize key numbers, status, and file names.
+4. Use bullet lists (- item 1) or numbered lists (1. item) when listing items.
+5. IF the user asks to navigate to a page OR if a shortcut link at the end of the text is helpful:
+   - Include a "link" block in "blocks" array with "url" set to one of: "HOME_SCREEN", "DOCUMENTS_SCREEN", "SCAN_SCREEN", "AI_SCREEN", "SETTINGS_SCREEN".
+   - Include a "navigation" object: { "targetScreen": "ENUM", "label": "Səhifəyə keç", "route": "/route" }.
+6. Respond in JSON format matching schema:
 {
-  "text": "Detallı addım-addım cavab mətni...",
+  "text": "Detailed text response with **bold** highlights...",
   "navigation": { "targetScreen": "SCAN_SCREEN", "label": "Skan Et səhifəsinə keç", "route": "/scan" },
   "blocks": [
-    { "type": "link", "label": "Skan Et səhifəsinə keç", "url": "SCAN_SCREEN", "content": "Sənəd yükləmək və ya skan etmək üçün Skan Et səhifəsinə keçə bilərsiniz." }
+    { "type": "link", "label": "Skan Et səhifəsinə keç", "url": "SCAN_SCREEN", "content": "Sənəd yükləmək üçün keçid." }
   ]
 }
-If no page navigation is needed, "navigation" and "blocks" can be omitted or empty.
+If no navigation is needed, "navigation" and "blocks" can be omitted.
 `;
 
   try {

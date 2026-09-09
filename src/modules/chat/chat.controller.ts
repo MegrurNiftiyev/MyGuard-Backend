@@ -56,8 +56,10 @@ export async function sendMessage(req: AuthenticatedRequest, res: Response) {
 
   const systemPrompt = getSystemPromptFor(dest, mode);
 
+  const userId = req.user?.uid || 'dev-user-123';
+
   if (mode === ChatMode.SMALL_CHAT) {
-    const smallResult = await callLlmSmall(systemPrompt, actualMessage);
+    const smallResult = await callLlmSmall(systemPrompt, actualMessage, userId);
     await logSmallChatMessage({ screenDestination: dest, message: actualMessage, reply: smallResult.text }); // fire-and-forget
     const response: SmallChatMessage = { 
       chatMode: mode, 
@@ -75,7 +77,6 @@ export async function sendMessage(req: AuthenticatedRequest, res: Response) {
 
   const docId = documentId || contextDocumentId;
   const history = await getChatHistory(sessionId, 10);
-  const userId = req.user?.uid || 'dev-user-123';
   const blocks = await callLlmLarge(systemPrompt, history, actualMessage, dest, userId, docId, attachedDocument, fileList);
   
   let historyMessageText = actualMessage;

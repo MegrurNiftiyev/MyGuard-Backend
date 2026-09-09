@@ -1072,3 +1072,48 @@ The ML service automatically caches downloaded Firebase models to local disk (`.
 2. If absent, it fetches the active model from Firebase Storage & Firestore.
 3. If Firebase is unreachable or no model is active, it will throw a `503 Service Unavailable` error instead of faking a response. Node.js should handle this `503` gracefully by showing an "analysis unavailable" or "pending" state on the frontend until the service is fully functional.
 
+---
+
+## 💬 13. Kiçik Chat (Small Chat) Live Query Və Pure Text Markdown İnteqrasiyası
+
+Floating chat widget-i və ya kiçik pəncərə rejimi üçün (`chatMode: 'SMALL_CHAT'`) cavablandırma mexanizmi böyük vizual komponentlərdən azad olunmuş və canlı verilənlər bazası sorğuları ilə zənginləşdirilmişdir.
+
+### 📌 13.1 İşləmə Prinsipi Və UI Tələbləri
+- **Yüngül Və Sürətli Mətn Rejimi:** `chatMode: 'SMALL_CHAT'` parametrində AI böyük cədvəl, qrafik və mürəkkəb bloklar yaradaraq interfeysi yükləmir; yalnız yığcam **Mətn (Pure Text / Markdown)** qaytarır.
+- **Vurğulama Və Siyahılar:**
+  - Sənəd adları, risk balları və vacib göstəricilər **`**bold**`** (məs: **Yüksək Risk (88/100)**, **maliyye_hesabati.pdf**, **14 sənəd**) olaraq vurğulanır.
+  - Sənədlər və ya statistikalar sadalandıqda `- ` (bullet list) və ya `1. ` (nömrəli siyahı) istifadə edilir.
+- **Dinamik DB Kontekst İnteqrasiyası (Live Query):**
+  - Backend hər `SMALL_CHAT` sorğusunda `getRiskSummaryReport(userId)` servisini çağıraraq ümumi skan sayını, təhlükəsiz/şübhəli/bloklanan sənədlərin sayını və son 5 yüklənən sənədin canlı məlumatlarını AI promptuna əlavə edir.
+  - Beləliklə, aşağıdakı tipli suallara canlı və dəqiq cavablar verilir:
+    - *"Son yüklənən sənədlərin statusu nədir?"*
+    - *"Yüksək riskli fayllar varmı?"*
+    - *"Bu gün neçə sənəd skan edilib?"*
+
+### 📌 13.2 Small Chat API Response Şablonu
+```json
+{
+  "chatMode": "SMALL_CHAT",
+  "text": "Son yüklənən **3 sənədin** cari təhlükəsizlik statusu aşağıdakı kimidir:\n\n- **maliyye_hesabati_q2.pdf** – Status: **Yüksək Risk** (Bal: **88/100**). *Gizli ağ mətn tespiti.*\n- **muqavile_draft_v2.docx** – Status: **Təhlükəsiz** (Bal: **12/100**). *Təmiz sənəd.*\n- **kadrlar_emr_04.pdf** – Status: **Şübhəli** (Bal: **65/100**). *Qeyri-standart mətn strukturu.*",
+  "navigation": {
+    "targetScreen": "DOCUMENTS_SCREEN",
+    "label": "Sənədlər səhifəsinə keç",
+    "route": "/documents"
+  },
+  "blocks": [
+    {
+      "type": "link",
+      "label": "Sənədlər səhifəsinə keç",
+      "url": "DOCUMENTS_SCREEN",
+      "content": "Sənədlərin tam siyahısına baxmaq üçün keçid edin."
+    }
+  ]
+}
+```
+
+### 📌 13.3 Prompt Token Optimallaşdırılması
+- System prompt-larda olan `===...` dekorativ xətlər və emojilər təmizlənmişdir.
+- Backend daxili promptlar sıx və effektiv İngilis dilinə keçirilmişdir.
+- AI-a məcburi qayda olaraq istifadəçinin daxil etdiyi dildə (Azərbaycan dilində) cavab tərtib etmək tapşırılmışdır.
+
+
