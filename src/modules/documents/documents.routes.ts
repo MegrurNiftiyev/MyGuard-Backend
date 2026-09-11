@@ -21,6 +21,15 @@ const router = Router();
  *     tags: [Documents]
  *     security:
  *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of user documents
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Document'
  */
 router.get('/', catchAsync(listDocuments));
 
@@ -39,9 +48,15 @@ router.get('/', catchAsync(listDocuments));
  *         schema:
  *           type: string
  *         description: Document ID
+ *     responses:
+ *       200:
+ *         description: Full document security details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Document'
  */
 router.get('/:id', catchAsync(getDocumentDetails));
-
 
 /**
  * @openapi
@@ -58,6 +73,13 @@ router.get('/:id', catchAsync(getDocumentDetails));
  *         schema:
  *           type: string
  *         description: Document ID
+ *     responses:
+ *       200:
+ *         description: Text comparison metrics and diffs
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DocumentComparisonResponse'
  */
 router.get('/:id/comparison', catchAsync(getDocumentComparison));
 
@@ -75,13 +97,29 @@ router.get('/:id/comparison', catchAsync(getDocumentComparison));
  *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required: [document]
  *             properties:
  *               document:
  *                 type: string
  *                 format: binary
+ *               isConfidential:
+ *                 type: string
+ *                 enum: ["true", "false"]
+ *                 example: "false"
+ *                 description: "Set to 'true' for local-only scanning without external LLM API"
  *     responses:
  *       200:
  *         description: Document uploaded and security analysis completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 document:
+ *                   $ref: '#/components/schemas/Document'
  */
 router.post('/upload', upload.single('document'), catchAsync(uploadDocument));
 
@@ -113,6 +151,10 @@ router.post('/upload', upload.single('document'), catchAsync(uploadDocument));
  *     responses:
  *       200:
  *         description: Cleaned document ready for download
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CleanDocumentResponse'
  */
 router.post('/:id/clean-injection', catchAsync(cleanInjection));
 
@@ -136,11 +178,21 @@ router.post('/:id/clean-injection', catchAsync(cleanInjection));
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [isContainInjection]
- *             properties:
- *               isContainInjection:
- *                 type: boolean
+ *             $ref: '#/components/schemas/LabelDocumentRequest'
+ *     responses:
+ *       200:
+ *         description: User label updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "İstifadəçi etiketi yeniləndi"
  */
 router.patch('/:id/label-by-user', catchAsync(labelByUser));
 
@@ -159,7 +211,23 @@ router.patch('/:id/label-by-user', catchAsync(labelByUser));
  *         schema:
  *           type: string
  *         description: Document ID
+ *     responses:
+ *       200:
+ *         description: Document deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Sənəd uğurla silindi"
  */
 router.delete('/:id', catchAsync(deleteDocument));
 
 export default router;
+
+

@@ -56,12 +56,10 @@ export interface Document {
   layer1_ocrTextMatch: {
     matchPercent: number;
     hiddenTextDetected: boolean;
-    extraTextSegments: string[];
+    hiddenTexts: string[];
     textDifferenceFound: boolean;
-    differenceSnippet: string; // for backward compatibility
-    differenceSnippets: string[]; // new list format
-    ocrText: string;
-    pdfTextLayer: string;
+    ocrText?: string;
+    pdfTextLayer?: string;
     status: 'clean' | 'suspicious';
   } | null;
 
@@ -70,7 +68,6 @@ export interface Document {
     confidence: number;
     accuracy: number;
     message: string;
-    categories: string[];
     requiresUserConfirmation: boolean;
   } | null;
 
@@ -78,11 +75,8 @@ export interface Document {
     used: boolean;
     isMalicious: boolean;
     confidence: number;
-    explanation: string | null;
-    message: string | null;
+    aiExplanation: string | null;
     recommendedAction: string | null;
-    attackVector?: string;
-    reasoning?: string;
     mitigationSteps?: string[];
   } | null;
 

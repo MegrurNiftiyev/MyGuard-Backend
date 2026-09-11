@@ -1,6 +1,7 @@
 import app from './app.js';
 import { env } from './config/env.js';
 import { isFirebaseInitialized } from './config/firebase.js';
+import { checkFastApiHealth } from './modules/analysis/fastapi.service.js';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
@@ -30,11 +31,12 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : env.PORT;
 
 httpServer.listen(PORT, async () => {
+  const isFastApiHealthy = await checkFastApiHealth();
   console.log(`===================================================`);
   console.log(`[MyGuard Backend] Server running on port ${PORT}`);
   console.log(`[MyGuard Backend] Swagger Docs: http://localhost:${PORT}/api-docs`);
   console.log(`[MyGuard Backend] Firebase Admin: ${isFirebaseInitialized ? 'CONNECTED' : 'MOCK/DEV MODE'}`);
-  console.log(`[MyGuard Backend] FastAPI Service: MOCKED (Will be provided externally)`);
+  console.log(`[MyGuard Backend] FastAPI Service: ${isFastApiHealthy ? `CONNECTED (${env.FASTAPI_ANALYSIS_URL})` : `UNAVAILABLE (${env.FASTAPI_ANALYSIS_URL})`}`);
   console.log(`===================================================`);
 
   // Test Firebase Admin Connection by writing a health check document

@@ -9,7 +9,6 @@ import {
   RegisterDto,
   LoginDto,
   AuthResponse,
-  OAuthLoginDto,
   Department,
   ALL_DEPARTMENTS,
 } from './auth.schema.js';
@@ -303,52 +302,6 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ token:
   } catch (err) {
     throw new AppError('Yeniləmə tokeni etibarsızdır və ya vaxtı bitib.', 401);
   }
-}
-
-/**
- * SSO / OAuth login for myGov and SİMA QR
- */
-export async function loginWithOAuth(dto: OAuthLoginDto): Promise<AuthResponse> {
-  const finCode = (dto.finCode || '7GOV999').toUpperCase();
-  let user = await findUserByFin(finCode);
-
-  if (!user) {
-    // Auto provision SSO user with unique FIN
-    const uid = 'usr-' + dto.provider + '-' + Date.now();
-    const now = new Date().toISOString();
-    user = {
-      uid,
-      fullName: dto.fullName || (dto.provider === 'mygov' ? 'myGov İstifadəçisi' : 'SİMA İstifadəçisi'),
-      finCode,
-      email: dto.email || `${finCode.toLowerCase()}@${dto.provider}.gov.az`,
-      phone: dto.phone || '+994 50 000 00 00',
-      passwordHash: '',
-      role: 'user',
-      department: 'Dövlət Portalı (SSO)',
-      authProvider: dto.provider,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    if (isFirebaseInitialized && db) {
-      try {
-        await db.collection(COLLECTIONS.USERS).doc(uid).set(user);
-      } catch (err) {
-        memoryUsers.set(uid, user);
-      }
-    } else {
-      memoryUsers.set(uid, user);
-    }
-  }
-
-  const { token, refreshToken } = generateTokens(user, false);
-
-  return {
-    success: true,
-    token,
-    refreshToken,
-    user: sanitizeProfile(user),
-  };
 }
 
 /**

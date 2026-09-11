@@ -4,7 +4,6 @@ import {
   registerUser,
   loginUser,
   refreshAccessToken,
-  loginWithOAuth,
 } from './auth.service.js';
 import { AppError } from '../../errors/AppError.js';
 
@@ -60,40 +59,6 @@ export async function refresh(req: Request, res: Response) {
 }
 
 /**
- * myGov QR / SSO login
- */
-export async function loginMyGov(req: Request, res: Response) {
-  const { finCode, qrSessionId, fullName, email, phone } = req.body;
-  const result = await loginWithOAuth({
-    provider: 'mygov',
-    finCode: finCode || '7MYG001',
-    qrSessionId,
-    fullName: fullName || 'myGov Doğrulanmış İstifadəçi',
-    email,
-    phone,
-  });
-  res.json(result);
-}
-
-/**
- * SİMA QR / SSO login
- */
-export async function loginSima(req: Request, res: Response) {
-  const { finCode, qrSessionId, fullName, email, phone } = req.body;
-  const result = await loginWithOAuth({
-    provider: 'sima',
-    finCode: finCode || '7SIM001',
-    qrSessionId,
-    fullName: fullName || 'SİMA Doğrulanmış İstifadəçi',
-    email,
-    phone,
-  });
-  res.json(result);
-}
-
-
-
-/**
  * Logout
  */
 export async function logout(req: AuthenticatedRequest, res: Response) {
@@ -102,3 +67,4 @@ export async function logout(req: AuthenticatedRequest, res: Response) {
   }
   res.json({ success: true, message: 'Uğurla çıxış edildi.' });
 }
+

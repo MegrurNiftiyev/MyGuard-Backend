@@ -13,7 +13,18 @@ const router = Router();
  *     tags: [Users]
  *     security:
  *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user profile details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
  */
 router.get('/me', requireAuth, catchAsync(getMe));
 
 export default router;
+

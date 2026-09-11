@@ -288,7 +288,7 @@ export async function callLlmLarge(
 - Hidden Text Detected: ${doc.layer1_ocrTextMatch?.hiddenTextDetected ? 'YES' : 'NO'}
 - Prompt Injection Detected: ${doc.isContainInjection ? 'YES (HIGH RISK)' : 'NO (SAFE)'}
 - ML Classifier Verdict: ${doc.layer2_classification?.label || 'safe'}
-- LLM Security Summary: ${doc.layer3_llmReview?.explanation || 'No malicious payload detected.'}
+- LLM Security Summary: ${doc.layer3_llmReview?.aiExplanation || 'No malicious payload detected.'}
 <untrusted_document_context filename="${doc.fileName}">
 ${doc.layer1_ocrTextMatch?.ocrText || 'Document text content.'}
 </untrusted_document_context>

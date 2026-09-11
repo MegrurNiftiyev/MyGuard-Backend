@@ -1,5 +1,5 @@
 export type UserRole = 'admin' | 'user' | 'analyst';
-export type AuthProvider = 'local' | 'mygov' | 'sima';
+export type AuthProvider = 'local';
 
 export enum Department {
   IT_CYBERSECURITY = 'İnformasiya Texnologiyaları və Kibertəhlükəsizlik',
@@ -60,18 +60,10 @@ export interface RefreshTokenDto {
   refreshToken: string;
 }
 
-export interface OAuthLoginDto {
-  provider: 'mygov' | 'sima';
-  finCode?: string;
-  qrSessionId?: string;
-  fullName?: string;
-  email?: string;
-  phone?: string;
-}
-
 export interface AuthResponse {
   success: boolean;
   token: string;
   refreshToken: string;
   user: UserProfile;
 }
+

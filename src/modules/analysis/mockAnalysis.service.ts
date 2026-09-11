@@ -9,9 +9,8 @@ export interface Layer2ClassifierResult {
 export interface Layer3LLMAnalysisResult {
   isMalicious: boolean;
   confidence: number;
-  explanation: string;
+  aiExplanation: string;
   recommendedAction: string;
-  attackVector?: string;
   mitigationSteps: string[];
 }
 
@@ -63,11 +62,10 @@ export async function runMockLayer3SecurityLLM(
     return {
       isMalicious: true,
       confidence: 0.97,
-      explanation:
+      aiExplanation:
         'Sənədin daxilində insan gözü ilə görünməyən və AI modelinin davranışını dəyişdirməyə yönəlmiş zərərli komandalar təsbit edildi.',
       recommendedAction:
         'Faylı dərhal karantinə alın, AI agentlərinə ötürülməsini bloklayın və şəbəkə administratoruna bildiriş göndərin.',
-      attackVector: 'Indirect Prompt Injection (Steganographic Text Layer)',
       mitigationSteps: [
         'Sənəddən vizual olmayan bütün daxili mətn qatlarını (text layer) silin.',
         'PDF sənədini təhlükəsiz OCR sanitizer ilə yenidən render edin.',
@@ -79,10 +77,9 @@ export async function runMockLayer3SecurityLLM(
   return {
     isMalicious: false,
     confidence: 0.99,
-    explanation:
+    aiExplanation:
       'Sənəd hərtərəfli analiz edildi. Hər hansı şübhəli kod, gizli prompt və ya manipulyasiya əlaməti aşkar edilmədi.',
     recommendedAction: 'Sənəd təhlükəsizdir, sistemlərə ötürülməsinə icazə verilir.',
-    attackVector: 'N/A',
     mitigationSteps: [],
   };
 }

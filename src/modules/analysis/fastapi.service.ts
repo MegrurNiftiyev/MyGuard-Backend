@@ -32,11 +32,15 @@ export interface TrainingJobResponse {
 export async function classifyDocumentText(
   payload: ClassifyRequestPayload
 ): Promise<ClassifyResponseData | null> {
-  const url = `${env.FASTAPI_ANALYSIS_URL}/classify`;
-  console.log(`[FastAPI Service] Sending classification request to ${url} for doc: ${payload.documentId}`);
+  const baseUrl = env.FASTAPI_ANALYSIS_URL.replace(/\/+$/, '');
+  const primaryUrl = `${baseUrl}/analyze-injection`;
+  const fallbackUrl = `${baseUrl}/classify`;
+
+  console.log(`[FastAPI Service] Sending classification request for doc: ${payload.documentId}`);
 
   const maxRetries = 1;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const url = attempt === 0 ? primaryUrl : fallbackUrl;
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
@@ -56,6 +60,21 @@ export async function classifyDocumentText(
 
       clearTimeout(timeoutId);
 
+      if (response.status === 503) {
+        const errorText = await response.text().catch(() => '');
+        if (errorText.includes('insufficient_text')) {
+          console.warn(`[FastAPI Service] Document ${payload.documentId} has under 5 words. Returning safe classification.`);
+          return { label: 'safe', confidence: 1.0, categories: [] };
+        }
+        console.warn(`[FastAPI Service] ML model unavailable (503): ${errorText}`);
+        return null;
+      }
+
+      if (response.status === 404 && attempt === 0) {
+        console.log(`[FastAPI Service] ${primaryUrl} returned 404, falling back to ${fallbackUrl}...`);
+        continue;
+      }
+
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
         console.warn(`[FastAPI Service] Classification returned status ${response.status}: ${errorText}`);
@@ -68,7 +87,11 @@ export async function classifyDocumentText(
 
       const data = (await response.json()) as ClassifyResponseData;
       console.log(`[FastAPI Service] Classification result for ${payload.documentId}: label=${data.label}, confidence=${data.confidence}`);
-      return data;
+      return {
+        label: data.label,
+        confidence: data.confidence,
+        categories: data.categories || [],
+      };
     } catch (err: any) {
       console.warn(`[FastAPI Service] Connection failed to ${url} (Attempt ${attempt + 1}/${maxRetries + 1}): ${err?.message || err}`);
       if (attempt < maxRetries) {

@@ -15,7 +15,12 @@ const router = Router();
  *     responses:
  *       200:
  *         description: Risk summary statistics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RiskSummary'
  */
 router.get('/risk-summary', catchAsync(getRiskSummary));
 
 export default router;
+

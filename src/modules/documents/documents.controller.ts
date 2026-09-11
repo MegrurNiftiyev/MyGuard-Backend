@@ -54,7 +54,18 @@ export async function getDocumentDetails(req: AuthenticatedRequest, res: Respons
     throw new AppError(translate('doc_not_found', lang), 404);
   }
 
-  res.json(document);
+  const responseDoc = {
+    ...document,
+    layer1_ocrTextMatch: document.layer1_ocrTextMatch ? {
+      matchPercent: document.layer1_ocrTextMatch.matchPercent,
+      hiddenTextDetected: document.layer1_ocrTextMatch.hiddenTextDetected,
+      hiddenTexts: document.layer1_ocrTextMatch.hiddenTexts || [],
+      textDifferenceFound: document.layer1_ocrTextMatch.textDifferenceFound,
+      status: document.layer1_ocrTextMatch.status,
+    } : null,
+  };
+
+  res.json(responseDoc);
 }
 
 
@@ -68,24 +79,31 @@ export async function getDocumentComparison(req: AuthenticatedRequest, res: Resp
   }
 
   const match = document.layer1_ocrTextMatch;
-  const flaggedSnippets = match?.differenceSnippets?.length ? match.differenceSnippets : (match?.extraTextSegments || []);
-  const flaggedSnippet = match?.differenceSnippet || flaggedSnippets.join('\n\n') || '';
+  const hiddenTexts = match?.hiddenTexts || (match as any)?.extraTextSegments || [];
+  
+  let ocrText = match?.ocrText || match?.pdfTextLayer || translate('no_data', lang);
+
+  if (hiddenTexts.length > 0) {
+    for (const hText of hiddenTexts) {
+      if (hText && !ocrText.includes(`<ferqli>${hText}</ferqli>`)) {
+        if (ocrText.includes(hText)) {
+          ocrText = ocrText.replace(hText, `<ferqli>${hText}</ferqli>`);
+        } else {
+          ocrText += `\n<ferqli>${hText}</ferqli>`;
+        }
+      }
+    }
+  }
 
   res.json({
     documentId: docId,
     documentName: document.fileName,
-    ocrText: match?.ocrText || match?.pdfTextLayer || translate('no_data', lang),
+    ocrText,
     pdfTextLayer: match?.pdfTextLayer || translate('no_data', lang),
     ocrPdfMatch: match?.matchPercent ?? 100,
     hiddenTextDetected: match?.hiddenTextDetected || false,
     textDifferenceFound: match?.textDifferenceFound || false,
-    flaggedSnippet,
-    flaggedSnippets,
-    flaggedMetadata: {
-      pageNumber: 1,
-      visibilityType: 'PDF Layer Only',
-      location: 'Text Layer Comparison'
-    },
+    hiddenTexts,
   });
 }
 

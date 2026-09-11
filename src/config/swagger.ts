@@ -1,5 +1,10 @@
 import swaggerJSDoc from 'swagger-jsdoc';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { env } from './env.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const options: swaggerJSDoc.Options = {
   definition: {
@@ -39,6 +44,7 @@ const options: swaggerJSDoc.Options = {
             fileSizeBytes: { type: 'integer', example: 3335 },
             fileType: { type: 'string', example: 'pdf' },
             uploadUrl: { type: 'string', example: 'gs://mygurad.firebasestorage.app/documents/usr-admin-001/doc-1787753837283-457_injection_iclas_007.pdf' },
+            isConfidential: { type: 'boolean', example: false },
             uploadedAt: { type: 'string', format: 'date-time' },
             scanStartedAt: { type: 'string', format: 'date-time' },
             scanFinishedAt: { type: 'string', format: 'date-time' },
@@ -63,11 +69,8 @@ const options: swaggerJSDoc.Options = {
               properties: {
                 matchPercent: { type: 'number', example: 100 },
                 hiddenTextDetected: { type: 'boolean', example: false },
-                extraTextSegments: { type: 'array', items: { type: 'string' } },
+                hiddenTexts: { type: 'array', items: { type: 'string' } },
                 textDifferenceFound: { type: 'boolean', example: false },
-                differenceSnippet: { type: 'string', example: '' },
-                ocrText: { type: 'string', example: 'Skan edilmiş OCR mətni...' },
-                pdfTextLayer: { type: 'string', example: 'PDF daxili raw text qatı...' },
                 status: { type: 'string', example: 'clean' },
               },
             },
@@ -78,7 +81,6 @@ const options: swaggerJSDoc.Options = {
                 confidence: { type: 'number', example: 0.98 },
                 accuracy: { type: 'number', example: 0.98 },
                 message: { type: 'string', example: 'ML classifier tərəfindən sənəd hərtərəfli təhlil edildi.' },
-                categories: { type: 'array', items: { type: 'string' } },
                 requiresUserConfirmation: { type: 'boolean', example: false },
               },
             },
@@ -86,55 +88,19 @@ const options: swaggerJSDoc.Options = {
               type: 'object',
               properties: {
                 used: { type: 'boolean', example: false },
-                explanation: { type: 'string', example: 'Sənəd hərtərəfli analiz edildi.' },
-                message: { type: 'string', example: 'Sənəd hərtərəfli analiz edildi.' },
+                isMalicious: { type: 'boolean', example: false },
+                confidence: { type: 'number', example: 0.98 },
+                aiExplanation: { type: 'string', example: 'Sənəd hərtərəfli analiz edildi.' },
                 recommendedAction: { type: 'string', example: 'Sənəd təhlükəsizdir. İcra oluna bilər.' },
+                mitigationSteps: { type: 'array', items: { type: 'string' } },
               },
             },
             finalRiskScore: { type: 'integer', example: 12 },
             finalStatus: { type: 'string', enum: ['safe', 'suspicious', 'high_risk', 'blocked'], example: 'safe' },
             reviewedByUser: { type: 'boolean', example: false },
-            userReviewLabel: { type: 'boolean', nullable: true, example: null },
+            userReviewLabel: { type: 'string', nullable: true, example: null },
             isContainInjection: { type: 'boolean', example: false },
             errorDetail: { type: 'string', nullable: true, example: null },
-          },
-        },
-        AnalysisResult: {
-          type: 'object',
-          properties: {
-            documentId: { type: 'string' },
-            analyzedAt: { type: 'string', format: 'date-time' },
-            overallRiskScore: { type: 'integer', example: 92 },
-            status: { type: 'string', enum: ['safe', 'suspicious', 'high_risk', 'blocked'] },
-            layer1_ocrTextMatch: {
-              type: 'object',
-              properties: {
-                matchPercent: { type: 'number', example: 85 },
-                hiddenTextDetected: { type: 'boolean', example: true },
-                extraTextSegments: { type: 'array', items: { type: 'string' } },
-              },
-            },
-            layer2_classification: {
-              type: 'object',
-              properties: {
-                classification: { type: 'string', example: 'High Risk' },
-                confidence: { type: 'number', example: 0.94 },
-                isInjection: { type: 'boolean', example: true },
-                riskCategory: { type: 'string', example: 'Prompt Injection' },
-                matchedSignatures: { type: 'array', items: { type: 'string' } },
-              },
-            },
-            layer3_llmAnalysis: {
-              type: 'object',
-              properties: {
-                isMalicious: { type: 'boolean', example: true },
-                confidence: { type: 'number', example: 0.97 },
-                explanation: { type: 'string' },
-                recommendedAction: { type: 'string' },
-                attackVector: { type: 'string' },
-                mitigationSteps: { type: 'array', items: { type: 'string' } },
-              },
-            },
           },
         },
         RiskSummary: {
@@ -150,8 +116,8 @@ const options: swaggerJSDoc.Options = {
               items: {
                 type: 'object',
                 properties: {
-                  category: { type: 'string' },
-                  count: { type: 'integer' },
+                  category: { type: 'string', example: 'Prompt Injection' },
+                  count: { type: 'integer', example: 5 },
                 },
               },
             },
@@ -196,14 +162,106 @@ const options: swaggerJSDoc.Options = {
             department: { $ref: '#/components/schemas/DepartmentEnum' },
           },
         },
+        LoginRequest: {
+          type: 'object',
+          required: ['password'],
+          properties: {
+            finCode: { type: 'string', example: '7AB1234' },
+            email: { type: 'string', example: 'e.mammadov@soc.gov.az' },
+            password: { type: 'string', example: 'Admin123!' },
+            rememberMe: { type: 'boolean', example: true },
+          },
+        },
+        RefreshTokenRequest: {
+          type: 'object',
+          required: ['refreshToken'],
+          properties: {
+            refreshToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
+          },
+        },
+        RegisterModelRequest: {
+          type: 'object',
+          required: ['name', 'provider', 'mode'],
+          properties: {
+            name: { type: 'string', example: 'New Custom Security Engine' },
+            provider: { type: 'string', example: 'FastAPI RETVec + CNN' },
+            mode: { type: 'string', example: 'CONFIDENTIAL AI' },
+          },
+        },
+        TrainModelRequest: {
+          type: 'object',
+          properties: {
+            datasetVersion: { type: 'string', example: 'v2026.08' },
+            epochs: { type: 'integer', example: 5 },
+            batchSize: { type: 'integer', example: 32 },
+          },
+        },
+        SendChatMessageRequest: {
+          type: 'object',
+          required: ['message'],
+          properties: {
+            chatMode: { type: 'string', enum: ['SMALL_CHAT', 'LARGE_CHAT'], example: 'LARGE_CHAT' },
+            screenDestination: { type: 'string', enum: ['HOME_SCREEN', 'DOCUMENTS_SCREEN', 'SCAN_SCREEN', 'SETTINGS_SCREEN', 'AI_SCREEN'], example: 'DOCUMENTS_SCREEN' },
+            message: { type: 'string', example: 'Salam, sənədlərdə olan prompt injection təhdidləri haqqında məlumat ver.' },
+            sessionId: { type: 'string', example: 'session-1724500000' },
+            documentId: { type: 'string', example: 'doc-1787753837283-457' },
+            files: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', example: 'attachment.pdf' },
+                  content: { type: 'string', example: 'Internal text stream...' },
+                },
+              },
+            },
+          },
+        },
+        DocumentComparisonResponse: {
+          type: 'object',
+          properties: {
+            documentId: { type: 'string', example: 'doc-1787753837283-457' },
+            matchPercent: { type: 'number', example: 85 },
+            textDifferenceFound: { type: 'boolean', example: true },
+            diffs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  count: { type: 'integer', example: 40 },
+                  added: { type: 'boolean', example: true },
+                  removed: { type: 'boolean', example: false },
+                  value: { type: 'string', example: '<ferqli>System prompt override...</ferqli>' },
+                },
+              },
+            },
+          },
+        },
+        CleanDocumentResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            message: { type: 'string', example: 'Prompt injection payloads successfully stripped from document.' },
+            cleanedDocumentId: { type: 'string', example: 'doc-1787753837283-457' },
+            downloadUrl: { type: 'string', example: 'https://storage.googleapis.com/myguard.appspot.com/cleaned/doc-1787753837283-457_cleaned.pdf' },
+          },
+        },
+        LabelDocumentRequest: {
+          type: 'object',
+          required: ['isContainInjection'],
+          properties: {
+            isContainInjection: { type: 'boolean', example: true },
+            userReviewLabel: { type: 'string', enum: ['confirmed_injection', 'false_positive'], example: 'confirmed_injection' },
+          },
+        },
         ChatMessage: {
           type: 'object',
           properties: {
-            id: { type: 'string' },
-            sessionId: { type: 'string' },
-            sender: { type: 'string', enum: ['user', 'assistant'] },
+            id: { type: 'string', example: 'msg-1724500005' },
+            sessionId: { type: 'string', example: 'session-1724500000' },
+            sender: { type: 'string', enum: ['user', 'assistant'], example: 'assistant' },
             timestamp: { type: 'string', format: 'date-time' },
-            content: { type: 'string' },
+            content: { type: 'string', example: 'AI Asistent cavab mətni' },
             blocks: { type: 'array', items: { type: 'object' } },
           },
         },
@@ -211,7 +269,17 @@ const options: swaggerJSDoc.Options = {
     },
     security: [{ BearerAuth: [] }],
   },
-  apis: ['./src/modules/**/*.routes.ts', './src/app.ts'],
+  apis: [
+    path.join(__dirname, '../modules/**/*.routes.ts'),
+    path.join(__dirname, '../modules/**/*.routes.js'),
+    path.join(__dirname, '../app.ts'),
+    path.join(__dirname, '../app.js'),
+    './src/modules/**/*.routes.ts',
+    './src/app.ts',
+    './dist/modules/**/*.routes.js',
+    './dist/app.js',
+  ],
 };
 
 export const swaggerSpec = swaggerJSDoc(options);
+

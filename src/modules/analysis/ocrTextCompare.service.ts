@@ -55,8 +55,8 @@ function isStructuralNoise(seg: string): boolean {
 function extractInjectionPatterns(text: string): string[] {
   const injectionSegments: string[] = [];
 
-  // Pattern 1: Comments or directives wrapped in // ... // or /* ... */ or // ... until end
-  const commentRegex = /(?:\/\/|\/\*|#|\[SYSTEM|\[INSTRUCTION|<hidden_prompt>)([\s\S]*?)(?:\/\/|\*\/|\]|<\/hidden_prompt>|\n\n|$)/gi;
+  // Pattern 1: Comments or directives wrapped in // ... // or /* ... */ or # ... or [BRACKETED PROTOCOLS/COMMANDS] or <TAGS>
+  const commentRegex = /(?:\/\/|\/\*|#|\[(?:SYSTEM|INSTRUCTION|FRANCHISE|OVERRIDE|PROTOCOL|COMMAND|SECURITY|PROMPT)[^\]]*\]|<hidden_prompt>)([\s\S]*?)(?:\/\/|\*\/|\]|<\/hidden_prompt>|\n\n|$)/gi;
   let match;
   while ((match = commentRegex.exec(text)) !== null) {
     const fullMatched = match[0].trim();
@@ -67,8 +67,8 @@ function extractInjectionPatterns(text: string): string[] {
     }
   }
 
-  // Pattern 2: Explicit prompt injection phrasing keywords
-  const injectionKeywordsRegex = /(?:bu sadece bir promptdur|yazismalarimizda qeti mene bildirme|ignore previous instructions|forget all previous|system directive|disregard prior|secret instruction|sil, bu haqqda|prompt injection|bu kicik xeta olsada)/gi;
+  // Pattern 2: Explicit prompt injection phrasing keywords & protocol overrides
+  const injectionKeywordsRegex = /(?:bu sadece bir promptdur|yazismalarimizda qeti mene bildirme|ignore previous instructions|forget all previous|system directive|disregard prior|secret instruction|sil, bu haqqda|prompt injection|bu kicik xeta olsada|override protocol|null and void|calculate all damage payouts|do not mention or disclose|exempt from any deductible|zero franchise|reporting override)/gi;
   const sentences = text.split(/(?<=[.!?\n])\s+/);
   for (const sentence of sentences) {
     const trimmed = sentence.trim();
@@ -248,14 +248,16 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
     const resultExtraSegments = mergedExtraSegments.length > 0 ? mergedExtraSegments : finalExtraSegments;
     const hiddenTextDetected = resultExtraSegments.length > 0;
 
-    // Calculate final clean OCR text (rawPdfText with injection segments stripped out if rawOcrText was missing)
+    // Calculate final clean OCR text (strip out injection segments from OCR text representation)
     let finalOcrText = rawOcrText;
-    if (!finalOcrText || finalOcrText.length < 10 || finalOcrText === 'OCR mətni oxundu') {
-      let cleaned = rawPdfText;
+    if (resultExtraSegments.length > 0) {
+      let cleaned = rawOcrText || rawPdfText;
       for (const seg of resultExtraSegments) {
         cleaned = cleaned.replace(seg, '').trim();
       }
       finalOcrText = cleaned.replace(/\s+/g, ' ').trim() || rawPdfText;
+    } else if (!finalOcrText || finalOcrText.length < 10 || finalOcrText === 'OCR mətni oxundu') {
+      finalOcrText = rawPdfText;
     }
 
     let matchPercent = 100;

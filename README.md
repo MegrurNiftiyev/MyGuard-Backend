@@ -192,12 +192,9 @@ interface DocumentRecord {
     used: boolean;
     isMalicious: boolean;
     confidence: number;
-    explanation: string;
-    message: string;
+    aiExplanation: string;
     recommendedAction: string;
-    attackVector: string;
-    reasoning: string;
-    mitigationSteps: string[];
+    mitigationSteps?: string[];
   };
   finalRiskScore: number;     // 0 (Safe) to 100 (Critical Threat)
   finalStatus: 'safe' | 'suspicious' | 'high_risk' | 'blocked';
@@ -272,37 +269,6 @@ Authenticates via FİN Code (primary) or Email with Password.
     "fullName": "Samir Əliyev",
     "finCode": "7AB1234",
     "email": "samir.aliyev@soc.gov.az",
-    "role": "user"
-  }
-}
-```
-
----
-
-#### `POST /api/auth/mygov` & `POST /api/auth/sima`
-SSO integration endpoints for national digital identity providers (**myGov** QR authentication & **SİMA** Digital Signature QR).
-
-- **Request Body:**
-```json
-{
-  "finCode": "7MYG001",
-  "qrSessionId": "mygov-qr-session-987123",
-  "fullName": "myGov Verified User",
-  "email": "verified.user@mygov.az",
-  "phone": "+994 50 111 22 33"
-}
-```
-
-- **Response (`200 OK`):**
-```json
-{
-  "success": true,
-  "provider": "mygov",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "uid": "usr-mygov-7MYG001",
-    "fullName": "myGov Verified User",
-    "finCode": "7MYG001",
     "role": "user"
   }
 }
@@ -452,14 +418,12 @@ Retrieves full 3-layer analysis metrics, hidden text diffs, and risk scores.
     "used": true,
     "isMalicious": true,
     "confidence": 0.985,
-    "explanation": "Steganographic hidden text detected inside PDF structural layer (<ferqli>Ignore previous instructions...</ferqli>).",
-    "message": "Critical indirect prompt injection detected in hidden background text layer.",
+    "aiExplanation": "Steganographic hidden text detected inside PDF structural layer (<ferqli>Ignore previous instructions...</ferqli>).",
     "recommendedAction": "FORWARDING THIS DOCUMENT TO ENTERPRISE LLM AGENTS MUST BE BLOCKED.",
-    "attackVector": "Indirect Prompt Injection (Steganographic Hidden Text Layer)",
-    "reasoning": "Discrepancy found between human-visible OCR text and PDF raw text stream.",
     "mitigationSteps": [
-      "Sanitize document by stripping hidden font layers and zero-opacity text.",
-      "Re-render PDF using flattened OCR visual image layer."
+      "Sənədin bütün versiyalarını yoxlayın.",
+      "Gizli komanda və ya manipulyasiya cəhdlərini aşkar etmək üçün mütəxəssislərlə əlaqə saxlayın.",
+      "Sənədin istifadəsini dayandırın və müvafiq tədbirlər görün."
     ]
   },
   "finalRiskScore": 92,
@@ -748,7 +712,7 @@ backend
     │   │   └── ocr.service.ts      # Tesseract.js & pdfjs-dist parser
     │   ├── auth/
     │   │   ├── auth.controller.ts
-    │   │   ├── auth.routes.ts     # Register, Login, Refresh, myGov & SİMA
+    │   │   ├── auth.routes.ts     # Register, Login, Refresh, Logout
     │   │   └── auth.service.ts
     │   ├── chat/
     │   │   ├── chat.controller.ts

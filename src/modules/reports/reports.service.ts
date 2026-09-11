@@ -54,9 +54,8 @@ export async function getRiskSummaryReport(userId: string): Promise<RiskDashboar
 
   const catMap: Record<string, number> = {};
   for (const d of docs) {
-    const cats = d.layer2_classification?.categories || [];
-    for (const c of cats) {
-      catMap[c] = (catMap[c] || 0) + 1;
+    if (d.layer2_classification?.label === 'injection') {
+      catMap['Prompt Injection'] = (catMap['Prompt Injection'] || 0) + 1;
     }
     if (d.layer1_ocrTextMatch?.hiddenTextDetected) {
       catMap['Hidden Text (Zero Opacity)'] = (catMap['Hidden Text (Zero Opacity)'] || 0) + 1;
