@@ -106,15 +106,23 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
     let normalizedOcrText = '';
     let normalizedOcrTextForCompare = '';
     try {
-      const images: Buffer[] = [];
-      const { createCanvas } = await import('@napi-rs/canvas');
-      for (let i = 1; i <= numPages; i++) {
-        const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2 });
-        const canvas = createCanvas(viewport.width, viewport.height);
-        const ctx = canvas.getContext('2d');
-        await page.render({ canvasContext: ctx as any, canvas: canvas as any, viewport }).promise;
-        images.push(canvas.toBuffer('image/png'));
+      let images: Buffer[] = [];
+      try {
+        const pdf2img = await import('pdf-img-convert');
+        const converted: any = await pdf2img.default.convert(pdfBuffer, { scale: 2 });
+        images = (converted as any[]).map((img: any) => Buffer.from(img));
+        console.log(`[Layer 1] pdf-img-convert ilə ${images.length} səhifə şəkildə rendered edildi.`);
+      } catch (imgErr: any) {
+        console.warn('[Layer 1] pdf-img-convert xətası, canvas fallback istifadə edilir:', imgErr?.message);
+        const { createCanvas } = await import('@napi-rs/canvas');
+        for (let i = 1; i <= numPages; i++) {
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 2 });
+          const canvas = createCanvas(viewport.width, viewport.height);
+          const ctx = canvas.getContext('2d');
+          await page.render({ canvasContext: ctx as any, canvas: canvas as any, viewport }).promise;
+          images.push(canvas.toBuffer('image/png'));
+        }
       }
 
       if (env.GOOGLE_VISION_API_KEY) {
