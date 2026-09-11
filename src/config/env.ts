@@ -14,4 +14,7 @@ export const env = {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
   OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4o-mini',
   GOOGLE_VISION_API_KEY: process.env.GOOGLE_VISION_API_KEY || '',
+  RESEND_API_KEY: process.env.RESEND_API_KEY || '',
+  EMAIL_FROM: process.env.EMAIL_FROM || 'MyGuard Security <noreply@myguard.az>',
 };
+

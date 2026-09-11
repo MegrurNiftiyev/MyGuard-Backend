@@ -1,3 +1,5 @@
+import { env } from '../config/env.js';
+
 /**
  * Email Service for sending OTP emails to users
  */
@@ -10,17 +12,16 @@ export async function sendOtpEmail(email: string, otp: string, fullName?: string
   console.log(`Valid for: 60 seconds`);
   console.log(`=============================================================\n`);
 
-  // Optional: If RESEND_API_KEY or SENDGRID_API_KEY is configured in .env, call their API here.
-  if (process.env.RESEND_API_KEY) {
+  if (env.RESEND_API_KEY) {
     try {
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+          'Authorization': `Bearer ${env.RESEND_API_KEY}`,
         },
         body: JSON.stringify({
-          from: process.env.EMAIL_FROM || 'MyGuard Security <noreply@myguard.az>',
+          from: env.EMAIL_FROM || 'MyGuard Security <noreply@myguard.az>',
           to: [email],
           subject: 'MyGuard — Şifrə Yeniləmə OTP Kodu',
           html: `
