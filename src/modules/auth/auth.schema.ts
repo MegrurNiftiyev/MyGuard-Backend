@@ -67,3 +67,40 @@ export interface AuthResponse {
   user: UserProfile;
 }
 
+export interface ForgotPasswordDto {
+  identifier: string; // FIN code or email
+}
+
+export interface ResendOtpDto {
+  identifier: string; // FIN code or email
+}
+
+export interface CheckOtpDto {
+  identifier: string; // FIN code or email
+  otp: string; // 6-digit code
+}
+
+export interface ChangePasswordDto {
+  identifier: string; // FIN code or email
+  newPassword: string;
+  resetToken: string;
+}
+
+export interface OtpRecord {
+  id: string;
+  userId: string;
+  otpHash: string;
+  expiresAt: number; // ms timestamp (now + 60s)
+  used: boolean;
+  createdAt: number;
+}
+
+export interface PasswordResetTokenRecord {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: number; // ms timestamp (now + 10 mins)
+  used: boolean;
+  createdAt: number;
+}
+

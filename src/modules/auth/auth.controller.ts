@@ -4,6 +4,10 @@ import {
   registerUser,
   loginUser,
   refreshAccessToken,
+  forgotPassword,
+  resendOtp,
+  checkOtp,
+  changePassword,
 } from './auth.service.js';
 import { AppError } from '../../errors/AppError.js';
 
@@ -67,4 +71,37 @@ export async function logout(req: AuthenticatedRequest, res: Response) {
   }
   res.json({ success: true, message: 'Uğurla çıxış edildi.' });
 }
+
+/**
+ * POST /api/auth/forgot-password -> sends 6-digit OTP
+ */
+export async function forgotPasswordController(req: Request, res: Response) {
+  const result = await forgotPassword(req.body);
+  res.json(result);
+}
+
+/**
+ * POST /api/auth/resend-otp -> invalidates old OTP, sends fresh OTP
+ */
+export async function resendOtpController(req: Request, res: Response) {
+  const result = await resendOtp(req.body);
+  res.json(result);
+}
+
+/**
+ * POST /api/auth/check-otp -> verifies OTP, returns resetToken (NOT a login session)
+ */
+export async function checkOtpController(req: Request, res: Response) {
+  const result = await checkOtp(req.body);
+  res.json(result);
+}
+
+/**
+ * POST /api/auth/change-password -> sets new password using resetToken (NOT a login session)
+ */
+export async function changePasswordController(req: Request, res: Response) {
+  const result = await changePassword(req.body);
+  res.json(result);
+}
+
 

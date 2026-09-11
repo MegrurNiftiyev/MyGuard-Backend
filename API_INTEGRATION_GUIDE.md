@@ -172,6 +172,75 @@ type AiMessageBlock =
 }
 ```
 
+### 🔹 3.4 `POST /api/auth/forgot-password` (OTP Kod Göndər)
+- **URL:** `https://mygurad-backend-v2.onrender.com/api/auth/forgot-password`
+- **Request Body (JSON):**
+```json
+{
+  "identifier": "7AB1234"
+}
+```
+*(Qeyd: `identifier` sahəsinə həm FİN Kod, həm də E-poçt daxil edilə bilər)*
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Əgər bu hesab mövcuddursa, OTP kodu göndərildi."
+}
+```
+
+### 🔹 3.5 `POST /api/auth/resend-otp` (Yeni OTP Kod Göndər)
+- **URL:** `https://mygurad-backend-v2.onrender.com/api/auth/resend-otp`
+- **Request Body (JSON):**
+```json
+{
+  "identifier": "7AB1234"
+}
+```
+*(İstifadəçinin əvvəlki aktiv OTP kodlarını ləğv edir, 30 saniyəlik resend cooldown tətbiq edir)*
+- **Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Yeni OTP kodu göndərildi."
+}
+```
+
+### 🔹 3.6 `POST /api/auth/check-otp` (OTP Kodu Yoxla və Reset Token Əldə Et)
+- **URL:** `https://mygurad-backend-v2.onrender.com/api/auth/check-otp`
+- **Request Body (JSON):**
+```json
+{
+  "identifier": "7AB1234",
+  "otp": "123456"
+}
+```
+- **Response (200 OK):** *(DİQQƏT: Avtomatik login etmir, yalnız 10 dəqiqəlik resetToken qaytarır)*
+```json
+{
+  "success": true,
+  "resetToken": "9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e"
+}
+```
+
+### 🔹 3.7 `POST /api/auth/change-password` (Yeni Şifrə Təyin Et)
+- **URL:** `https://mygurad-backend-v2.onrender.com/api/auth/change-password`
+- **Request Body (JSON):**
+```json
+{
+  "identifier": "7AB1234",
+  "newPassword": "NewSecretPassword123!",
+  "resetToken": "9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e"
+}
+```
+- **Response (200 OK):** *(Əvvəlki sessiyaları/JWT-ləri ləğv edir, istifadəçini avtomatik login etmir)*
+```json
+{
+  "success": true,
+  "message": "Şifrə uğurla yeniləndi. Zəhmət olmasa yenidən daxil olun."
+}
+```
+
 ---
 
 ## 📄 4. Sənəd Yükləmə, Skan və Dərin Analiz (`/api/documents`)

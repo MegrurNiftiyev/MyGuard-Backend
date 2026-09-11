@@ -7,4 +7,6 @@ export const COLLECTIONS = {
   CHAT_MESSAGES: 'chatMessages',
   MODEL_VERSIONS: 'modelVersions',
   SECURITY_EVENTS: 'securityEvents',
+  PASSWORD_RESET_OTPS: 'passwordResetOtps',
+  PASSWORD_RESET_TOKENS: 'passwordResetTokens',
 } as const;

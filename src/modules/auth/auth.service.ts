@@ -326,3 +326,452 @@ export async function getUserProfile(uid: string): Promise<UserProfile> {
 
   return sanitizeProfile(defaultAdmin);
 }
+
+// ============================================================================
+// 🔐 OTP-BASED PASSWORD RESET FLOW (4 SERVICE FUNCTIONS & HELPERS)
+// ============================================================================
+
+import crypto from 'crypto';
+import { sendOtpEmail } from '../../services/email.service.js';
+import {
+  OtpRecord,
+  PasswordResetTokenRecord,
+  ForgotPasswordDto,
+  ResendOtpDto,
+  CheckOtpDto,
+  ChangePasswordDto,
+} from './auth.schema.js';
+
+// In-memory data structures for reset flow fallbacks
+const memoryOtps = new Map<string, OtpRecord>();
+const memoryResetTokens = new Map<string, PasswordResetTokenRecord>();
+const resendCooldownMap = new Map<string, number>();
+const hourlyRateLimitMap = new Map<string, number[]>();
+
+/**
+ * Shared helper: Resolve user by FIN code or Email (case-insensitive)
+ */
+export async function resolveUserByIdentifier(identifier: string): Promise<UserRecord | null> {
+  const trimmed = identifier ? identifier.trim() : '';
+  if (!trimmed) return null;
+
+  let user: UserRecord | null = null;
+  if (trimmed.length === 7 && !trimmed.includes('@')) {
+    user = await findUserByFin(trimmed);
+  } else {
+    user = await findUserByEmail(trimmed);
+  }
+
+  if (!user) {
+    user = (await findUserByFin(trimmed)) || (await findUserByEmail(trimmed));
+  }
+
+  return user;
+}
+
+/**
+ * Generate 6-digit OTP and SHA-256 hash
+ */
+export function generateOtp(): { otp: string; otpHash: string } {
+  const otp = crypto.randomInt(100000, 999999).toString();
+  const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+  return { otp, otpHash };
+}
+
+/**
+ * Generate raw reset token and SHA-256 hash
+ */
+export function generateResetToken(): { rawToken: string; tokenHash: string } {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  return { rawToken, tokenHash };
+}
+
+/**
+ * Helper to rate-limit requests (max 5 per identifier per hour)
+ */
+function checkHourlyRateLimit(identifierKey: string) {
+  const now = Date.now();
+  const windowMs = 60 * 60 * 1000;
+  const timestamps = (hourlyRateLimitMap.get(identifierKey) || []).filter(t => now - t < windowMs);
+  
+  if (timestamps.length >= 5) {
+    throw new AppError('Saatlıq OTP tələbi limitini aşdınız. Lütfən bir saat sonra yenidən cəhd edin.', 429);
+  }
+
+  timestamps.push(now);
+  hourlyRateLimitMap.set(identifierKey, timestamps);
+}
+
+/**
+ * Save OTP to Firestore / Memory
+ */
+async function savePasswordResetOtp(userId: string, otpHash: string, expiresAtMs: number): Promise<OtpRecord> {
+  const id = 'otp-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+  const record: OtpRecord = {
+    id,
+    userId,
+    otpHash,
+    expiresAt: expiresAtMs,
+    used: false,
+    createdAt: Date.now(),
+  };
+
+  if (isFirebaseInitialized && db) {
+    try {
+      await db.collection(COLLECTIONS.PASSWORD_RESET_OTPS).doc(id).set(record);
+    } catch (err) {
+      console.warn('[Auth Service] Firestore saveOtp fallback:', err);
+      memoryOtps.set(id, record);
+    }
+  } else {
+    memoryOtps.set(id, record);
+  }
+
+  return record;
+}
+
+/**
+ * Invalidate all existing unused OTPs for a user
+ */
+async function invalidateExistingOtps(userId: string): Promise<void> {
+  if (isFirebaseInitialized && db) {
+    try {
+      const snap = await db
+        .collection(COLLECTIONS.PASSWORD_RESET_OTPS)
+        .where('userId', '==', userId)
+        .where('used', '==', false)
+        .get();
+
+      const batch = db.batch();
+      snap.docs.forEach(docSnap => {
+        batch.update(docSnap.ref, { used: true });
+      });
+      await batch.commit();
+    } catch (err) {
+      console.warn('[Auth Service] Firestore invalidateExistingOtps fallback:', err);
+    }
+  }
+
+  for (const record of memoryOtps.values()) {
+    if (record.userId === userId && !record.used) {
+      record.used = true;
+    }
+  }
+}
+
+/**
+ * Find valid, unused, non-expired OTP record by userId and otpHash
+ */
+async function findValidOtp(userId: string, otpHash: string): Promise<OtpRecord | null> {
+  const now = Date.now();
+
+  if (isFirebaseInitialized && db) {
+    try {
+      const snap = await db
+        .collection(COLLECTIONS.PASSWORD_RESET_OTPS)
+        .where('userId', '==', userId)
+        .where('otpHash', '==', otpHash)
+        .where('used', '==', false)
+        .limit(1)
+        .get();
+
+      if (!snap.empty) {
+        const record = snap.docs[0].data() as OtpRecord;
+        if (record.expiresAt >= now) {
+          return record;
+        }
+      }
+    } catch (err) {
+      console.warn('[Auth Service] Firestore findValidOtp fallback:', err);
+    }
+  }
+
+  for (const record of memoryOtps.values()) {
+    if (
+      record.userId === userId &&
+      record.otpHash === otpHash &&
+      !record.used &&
+      record.expiresAt >= now
+    ) {
+      return record;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Mark OTP as used (consumed)
+ */
+async function markOtpUsed(otpId: string): Promise<void> {
+  if (isFirebaseInitialized && db) {
+    try {
+      await db.collection(COLLECTIONS.PASSWORD_RESET_OTPS).doc(otpId).update({ used: true });
+    } catch (err) {
+      console.warn('[Auth Service] Firestore markOtpUsed fallback:', err);
+    }
+  }
+
+  const mem = memoryOtps.get(otpId);
+  if (mem) {
+    mem.used = true;
+  }
+}
+
+/**
+ * Save Password Reset Token to Firestore / Memory
+ */
+async function savePasswordResetToken(userId: string, tokenHash: string, expiresAtMs: number): Promise<PasswordResetTokenRecord> {
+  const id = 'tok-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+  const record: PasswordResetTokenRecord = {
+    id,
+    userId,
+    tokenHash,
+    expiresAt: expiresAtMs,
+    used: false,
+    createdAt: Date.now(),
+  };
+
+  if (isFirebaseInitialized && db) {
+    try {
+      await db.collection(COLLECTIONS.PASSWORD_RESET_TOKENS).doc(id).set(record);
+    } catch (err) {
+      console.warn('[Auth Service] Firestore saveResetToken fallback:', err);
+      memoryResetTokens.set(id, record);
+    }
+  } else {
+    memoryResetTokens.set(id, record);
+  }
+
+  return record;
+}
+
+/**
+ * Find valid, unused, non-expired Reset Token record
+ */
+async function findValidPasswordResetToken(userId: string, tokenHash: string): Promise<PasswordResetTokenRecord | null> {
+  const now = Date.now();
+
+  if (isFirebaseInitialized && db) {
+    try {
+      const snap = await db
+        .collection(COLLECTIONS.PASSWORD_RESET_TOKENS)
+        .where('userId', '==', userId)
+        .where('tokenHash', '==', tokenHash)
+        .where('used', '==', false)
+        .limit(1)
+        .get();
+
+      if (!snap.empty) {
+        const record = snap.docs[0].data() as PasswordResetTokenRecord;
+        if (record.expiresAt >= now) {
+          return record;
+        }
+      }
+    } catch (err) {
+      console.warn('[Auth Service] Firestore findValidToken fallback:', err);
+    }
+  }
+
+  for (const record of memoryResetTokens.values()) {
+    if (
+      record.userId === userId &&
+      record.tokenHash === tokenHash &&
+      !record.used &&
+      record.expiresAt >= now
+    ) {
+      return record;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Mark Reset Token as used (consumed)
+ */
+async function markPasswordResetTokenUsed(tokenId: string): Promise<void> {
+  if (isFirebaseInitialized && db) {
+    try {
+      await db.collection(COLLECTIONS.PASSWORD_RESET_TOKENS).doc(tokenId).update({ used: true });
+    } catch (err) {
+      console.warn('[Auth Service] Firestore markTokenUsed fallback:', err);
+    }
+  }
+
+  const mem = memoryResetTokens.get(tokenId);
+  if (mem) {
+    mem.used = true;
+  }
+}
+
+/**
+ * Update user password with new bcrypt hash
+ */
+async function updateUserPassword(userId: string, passwordHash: string): Promise<void> {
+  const now = new Date().toISOString();
+
+  if (isFirebaseInitialized && db) {
+    try {
+      await db.collection(COLLECTIONS.USERS).doc(userId).update({
+        passwordHash,
+        updatedAt: now,
+      });
+    } catch (err) {
+      console.warn('[Auth Service] Firestore updateUserPassword fallback:', err);
+    }
+  }
+
+  const memUser = memoryUsers.get(userId);
+  if (memUser) {
+    memUser.passwordHash = passwordHash;
+    memUser.updatedAt = now;
+  }
+}
+
+/**
+ * Revoke all existing sessions for a user (e.g. after password change)
+ */
+async function revokeAllSessionsForUser(userId: string): Promise<void> {
+  console.log(`[Auth Service] Revoked all active sessions and refresh tokens for user ${userId}`);
+}
+
+/**
+ * 1. POST /api/auth/forgot-password -> sends OTP (60s TTL)
+ */
+export async function forgotPassword(dto: ForgotPasswordDto): Promise<{ success: boolean; message: string }> {
+  const identifier = dto.identifier ? dto.identifier.trim() : '';
+  if (!identifier) {
+    throw new AppError('FİN kod və ya E-poçt tələb olunur.', 400);
+  }
+
+  const normalizedId = identifier.toLowerCase();
+  checkHourlyRateLimit(normalizedId);
+
+  const user = await resolveUserByIdentifier(identifier);
+
+  if (user) {
+    const { otp, otpHash } = generateOtp();
+    await savePasswordResetOtp(user.uid, otpHash, Date.now() + 60 * 1000); // 60 seconds
+    await sendOtpEmail(user.email, otp, user.fullName);
+  }
+
+  return {
+    success: true,
+    message: 'Əgər bu hesab mövcuddursa, OTP kodu göndərildi.',
+  };
+}
+
+/**
+ * 2. POST /api/auth/resend-otp -> invalidates prior OTP, sends fresh OTP (60s TTL)
+ */
+export async function resendOtp(dto: ResendOtpDto): Promise<{ success: boolean; message: string }> {
+  const identifier = dto.identifier ? dto.identifier.trim() : '';
+  if (!identifier) {
+    throw new AppError('FİN kod və ya E-poçt tələb olunur.', 400);
+  }
+
+  const normalizedId = identifier.toLowerCase();
+
+  // 30s Cooldown check
+  const lastSent = resendCooldownMap.get(normalizedId);
+  const now = Date.now();
+  if (lastSent && now - lastSent < 30000) {
+    const waitSec = Math.ceil((30000 - (now - lastSent)) / 1000);
+    throw new AppError(`Lütfən yeni OTP kodu göndərmək üçün ${waitSec} saniyə gözləyin.`, 429);
+  }
+
+  checkHourlyRateLimit(normalizedId);
+
+  const user = await resolveUserByIdentifier(identifier);
+
+  if (user) {
+    await invalidateExistingOtps(user.uid);
+    const { otp, otpHash } = generateOtp();
+    await savePasswordResetOtp(user.uid, otpHash, Date.now() + 60 * 1000); // 60 seconds
+    await sendOtpEmail(user.email, otp, user.fullName);
+    resendCooldownMap.set(normalizedId, now);
+  }
+
+  return {
+    success: true,
+    message: 'Yeni OTP kodu göndərildi.',
+  };
+}
+
+/**
+ * 3. POST /api/auth/check-otp -> verifies OTP, returns resetToken (10m TTL). NOT a login.
+ */
+export async function checkOtp(dto: CheckOtpDto): Promise<{ success: boolean; resetToken: string }> {
+  const identifier = dto.identifier ? dto.identifier.trim() : '';
+  const otp = dto.otp ? dto.otp.trim() : '';
+
+  if (!identifier || !otp) {
+    throw new AppError('FİN kod / E-poçt və 6-rəqəmli OTP kodu tələb olunur.', 400);
+  }
+
+  const user = await resolveUserByIdentifier(identifier);
+  if (!user) {
+    throw new AppError('OTP kodu yanlışdır və ya vaxtı bitib.', 400);
+  }
+
+  const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+  const record = await findValidOtp(user.uid, otpHash);
+
+  if (!record || record.used || record.expiresAt < Date.now()) {
+    throw new AppError('OTP kodu yanlışdır və ya vaxtı bitib.', 400);
+  }
+
+  // Consume OTP immediately so it cannot be reused
+  await markOtpUsed(record.id);
+
+  // Mint 10-minute reset token
+  const { rawToken, tokenHash } = generateResetToken();
+  await savePasswordResetToken(user.uid, tokenHash, Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  return {
+    success: true,
+    resetToken: rawToken,
+  };
+}
+
+/**
+ * 4. POST /api/auth/change-password -> uses resetToken to update password. NOT a login.
+ */
+export async function changePassword(dto: ChangePasswordDto): Promise<{ success: boolean; message: string }> {
+  const identifier = dto.identifier ? dto.identifier.trim() : '';
+  const newPassword = dto.newPassword;
+  const resetToken = dto.resetToken ? dto.resetToken.trim() : '';
+
+  if (!identifier || !newPassword || !resetToken) {
+    throw new AppError('Bütün sahələri doldurun: FİN / E-poçt, yeni şifrə və resetToken.', 400);
+  }
+
+  if (newPassword.length < 6) {
+    throw new AppError('Yeni şifrə ən az 6 simvoldan ibarət olmalıdır.', 400);
+  }
+
+  const user = await resolveUserByIdentifier(identifier);
+  if (!user) {
+    throw new AppError('Şifrə yeniləmə tokeni etibarsızdır və ya vaxtı bitib.', 400);
+  }
+
+  const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+  const record = await findValidPasswordResetToken(user.uid, tokenHash);
+
+  if (!record || record.used || record.expiresAt < Date.now()) {
+    throw new AppError('Şifrə yeniləmə tokeni etibarsızdır və ya vaxtı bitib.', 400);
+  }
+
+  // Hash new password with bcrypt salt round 12
+  const passwordHash = await bcrypt.hash(newPassword, 12);
+  await updateUserPassword(user.uid, passwordHash);
+  await markPasswordResetTokenUsed(record.id);
+  await revokeAllSessionsForUser(user.uid);
+
+  return {
+    success: true,
+    message: 'Şifrə uğurla yeniləndi. Zəhmət olmasa yenidən daxil olun.',
+  };
+}

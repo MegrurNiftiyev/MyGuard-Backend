@@ -179,6 +179,37 @@ const options: swaggerJSDoc.Options = {
             refreshToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
           },
         },
+        ForgotPasswordRequest: {
+          type: 'object',
+          required: ['identifier'],
+          properties: {
+            identifier: { type: 'string', example: '7AB1234', description: 'FİN code or Email' },
+          },
+        },
+        ResendOtpRequest: {
+          type: 'object',
+          required: ['identifier'],
+          properties: {
+            identifier: { type: 'string', example: '7AB1234', description: 'FİN code or Email' },
+          },
+        },
+        CheckOtpRequest: {
+          type: 'object',
+          required: ['identifier', 'otp'],
+          properties: {
+            identifier: { type: 'string', example: '7AB1234', description: 'FİN code or Email' },
+            otp: { type: 'string', example: '123456', description: '6-digit OTP code' },
+          },
+        },
+        ChangePasswordRequest: {
+          type: 'object',
+          required: ['identifier', 'newPassword', 'resetToken'],
+          properties: {
+            identifier: { type: 'string', example: '7AB1234', description: 'FİN code or Email' },
+            newPassword: { type: 'string', example: 'NewSecretPassword123!' },
+            resetToken: { type: 'string', example: '9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9f8e' },
+          },
+        },
         RegisterModelRequest: {
           type: 'object',
           required: ['name', 'provider', 'mode'],
