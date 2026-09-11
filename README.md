@@ -622,33 +622,6 @@ Triggers asynchronous model retraining on the Python FastAPI ML microservice.
 
 ---
 
-## 📊 Analytics & Reports (`/api/reports`)
-
-#### `GET /api/reports/risk-summary`
-
-- **Response (`200 OK`):**
-```json
-{
-  "totalDocumentsScanned": 1420,
-  "cleanDocuments": 1150,
-  "suspiciousDocuments": 180,
-  "blockedDocuments": 90,
-  "averageScanDurationMs": 14200,
-  "topAttackVectors": [
-    { "vector": "Indirect Prompt Injection", "count": 65 },
-    { "vector": "Hidden Text Steganography", "count": 18 },
-    { "vector": "Jailbreak Payload", "count": 7 }
-  ],
-  "monthlyTrend": [
-    { "month": "May", "scans": 280, "injections": 12 },
-    { "month": "Jun", "scans": 340, "injections": 19 },
-    { "month": "Jul", "scans": 410, "injections": 25 },
-    { "month": "Aug", "scans": 390, "injections": 34 }
-  ]
-}
-```
-
----
 
 ## 🔌 Real-Time WebSocket Gateway (Socket.IO)
 

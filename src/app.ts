@@ -8,7 +8,6 @@ import { isFirebaseInitialized } from './config/firebase.js';
 
 import authRoutes from './modules/auth/auth.routes.js';
 import documentRoutes from './modules/documents/documents.routes.js';
-import reportRoutes from './modules/reports/reports.routes.js';
 import chatRoutes from './modules/chat/chat.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
 import usersRoutes from './modules/users/users.routes.js';
@@ -63,7 +62,6 @@ app.use('/api/auth', authRoutes);
 // Protected Core Application Routes (Token Authentication Enforced)
 app.use('/api/users', requireAuth, usersRoutes);
 app.use('/api/documents', requireAuth, documentRoutes);
-app.use('/api/reports', requireAuth, reportRoutes);
 app.use('/api/chat', requireAuth, chatRoutes);
 app.use('/api/admin', requireAuth, adminRoutes);
 
