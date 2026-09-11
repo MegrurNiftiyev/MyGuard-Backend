@@ -85,22 +85,62 @@ export interface ClassifyPayload {
 - `label`: `"safe"` | `"suspicious"` | `"injection"`
 - `confidence`: `float` between `0.0` and `1.0`
 
-#### Error Responses
-- `422 Unprocessable Entity`: Body is missing required fields (`documentId`, `fullText`) or contains forbidden extra keys.
-- `401 Unauthorized`: Missing or invalid `X-Internal-Token`.
-- `403 Forbidden`: Node.js IP banned due to 3 failed token attempts.
+#### Error Responses Schema (`Standardized JSON`)
+All error responses return a standardized, clean JSON payload containing `code` and `message`:
+
+```json
+{
+  "code": "UNPROCESSABLE_ENTITY",
+  "message": "Field 'fullText' is required"
+}
+```
+
+##### Status Codes Summary:
+- `422 Unprocessable Entity`: Body is missing required fields (`documentId`, `fullText`) or contains forbidden extra keys:
+  ```json
+  {
+    "code": "UNPROCESSABLE_ENTITY",
+    "message": "Field 'fullText' is required"
+  }
+  ```
+- `401 Unauthorized`: Missing or invalid `X-Internal-Token`:
+  ```json
+  {
+    "code": "UNAUTHORIZED",
+    "message": "Unauthorized service call: Invalid X-Internal-Token header."
+  }
+  ```
+- `403 Forbidden`: Node.js IP banned due to 3 failed token attempts:
+  ```json
+  {
+    "code": "FORBIDDEN",
+    "message": "Access forbidden: Client IP has been banned due to repeated authentication failures."
+  }
+  ```
 - `503 Service Unavailable`:
-  - Word count under 5: `{"detail": "insufficient_text"}`
-  - Model load failure: `{"detail": {"error": "Classification model unavailable", "detail": "..."}}`
+  - Word count under 5:
+    ```json
+    {
+      "code": "SERVICE_UNAVAILABLE",
+      "message": "insufficient_text"
+    }
+    ```
+  - Model load failure:
+    ```json
+    {
+      "code": "SERVICE_UNAVAILABLE",
+      "message": "Classification model unavailable"
+    }
+    ```
 
 ---
 
-### 💻 Node.js Axios / Fetch Integration Example
+### 💻 Node.js Axios Integration Example
 
 Below is a complete, production-ready TypeScript/Node.js helper function to call Layer 2 ML `/analyze-injection`:
 
 ```typescript
-import { env } from '../../config/env.js';
+import axios, { AxiosError } from 'axios';
 
 export interface ClassifyPayload {
   documentId: string;
@@ -112,42 +152,48 @@ export interface ClassifyResponse {
   confidence: number;
 }
 
+export interface MlApiErrorResponse {
+  code: string;
+  message: string;
+}
+
 export async function classifyDocumentWithMlService(
   payload: ClassifyPayload
 ): Promise<ClassifyResponse> {
-  const mlServiceUrl = env.FASTAPI_ANALYSIS_URL || 'https://myguard-ai-backend.onrender.com';
-  const internalToken = env.INTERNAL_SERVICE_TOKEN;
+  const mlServiceUrl = process.env.FASTAPI_ANALYSIS_URL || 'https://myguard-ai-backend.onrender.com';
+  const internalToken = process.env.INTERNAL_SERVICE_TOKEN;
 
   if (!internalToken) {
     throw new Error('INTERNAL_SERVICE_TOKEN environment variable is not defined.');
   }
 
   try {
-    const response = await fetch(`${mlServiceUrl}/analyze-injection`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Internal-Token': internalToken,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (response.status === 503) {
-      const errorData = await response.json().catch(() => ({}));
-      if (errorData.detail === 'insufficient_text') {
-        console.warn(`[ML-Service] Document ${payload.documentId} has under 5 words. Skipping ML analysis.`);
-        return { label: 'safe', confidence: 1.0 };
+    const response = await axios.post<ClassifyResponse>(
+      `${mlServiceUrl}/analyze-injection`,
+      payload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Token': internalToken,
+        },
+        timeout: 10000, // 10s timeout
       }
-      console.warn('[ML-Service] Model is currently unavailable.');
-      throw new Error('ML Service model unavailable');
-    }
+    );
 
-    if (!response.ok) {
-      throw new Error(`ML Service returned HTTP ${response.status}`);
-    }
-
-    return (await response.json()) as ClassifyResponse;
+    return response.data;
   } catch (error: any) {
+    if (axios.isAxiosError(error) && error.response) {
+      const status = error.response.status;
+      const errorData = error.response.data as MlApiErrorResponse;
+
+      if (status === 503) {
+        if (errorData?.message === 'insufficient_text' || (errorData as any)?.detail === 'insufficient_text') {
+          console.warn(`[ML-Service] Document ${payload.documentId} has under 5 words. Skipping ML analysis.`);
+          return { label: 'safe', confidence: 1.0 };
+        }
+        console.warn('[ML-Service] Model is currently unavailable. Node backend handling fallback.');
+      }
+    }
     console.error('Failed to classify document with ML service:', error.message);
     throw error;
   }

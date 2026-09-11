@@ -894,13 +894,53 @@ export interface ClassifyPayload {
 - `label`: `"safe"` | `"suspicious"` | `"injection"`
 - `confidence`: `float` between `0.0` and `1.0`
 
-##### Error Responses
-- `422 Unprocessable Entity`: Body is missing required fields (`documentId`, `fullText`) or contains forbidden extra keys.
-- `401 Unauthorized`: Missing or invalid `X-Internal-Token`.
-- `403 Forbidden`: Node.js IP banned due to 3 failed token attempts.
+##### Error Responses Schema (`Standardized JSON`)
+All error responses return a standardized, clean JSON payload containing `code` and `message`:
+
+```json
+{
+  "code": "UNPROCESSABLE_ENTITY",
+  "message": "Field 'fullText' is required"
+}
+```
+
+###### Status Codes Summary:
+- `422 Unprocessable Entity`: Body is missing required fields (`documentId`, `fullText`) or contains forbidden extra keys:
+  ```json
+  {
+    "code": "UNPROCESSABLE_ENTITY",
+    "message": "Field 'fullText' is required"
+  }
+  ```
+- `401 Unauthorized`: Missing or invalid `X-Internal-Token`:
+  ```json
+  {
+    "code": "UNAUTHORIZED",
+    "message": "Unauthorized service call: Invalid X-Internal-Token header."
+  }
+  ```
+- `403 Forbidden`: Node.js IP banned due to 3 failed token attempts:
+  ```json
+  {
+    "code": "FORBIDDEN",
+    "message": "Access forbidden: Client IP has been banned due to repeated authentication failures."
+  }
+  ```
 - `503 Service Unavailable`:
-  - Word count under 5: `{"detail": "insufficient_text"}`
-  - Model load failure: `{"detail": {"error": "Classification model unavailable", "detail": "..."}}`
+  - Word count under 5:
+    ```json
+    {
+      "code": "SERVICE_UNAVAILABLE",
+      "message": "insufficient_text"
+    }
+    ```
+  - Model load failure:
+    ```json
+    {
+      "code": "SERVICE_UNAVAILABLE",
+      "message": "Classification model unavailable"
+    }
+    ```
 
 ---
 
@@ -919,6 +959,11 @@ export interface ClassifyPayload {
 export interface ClassifyResponse {
   label: 'safe' | 'suspicious' | 'injection';
   confidence: number;
+}
+
+export interface MlApiErrorResponse {
+  code: string;
+  message: string;
 }
 
 export async function classifyDocumentWithMlService(
@@ -942,8 +987,8 @@ export async function classifyDocumentWithMlService(
     });
 
     if (response.status === 503) {
-      const errorData = await response.json().catch(() => ({}));
-      if (errorData.detail === 'insufficient_text') {
+      const errorData = (await response.json().catch(() => ({}))) as MlApiErrorResponse;
+      if (errorData.message === 'insufficient_text' || (errorData as any).detail === 'insufficient_text') {
         console.warn(`[ML-Service] Document ${payload.documentId} has under 5 words. Skipping ML analysis.`);
         return { label: 'safe', confidence: 1.0 };
       }
