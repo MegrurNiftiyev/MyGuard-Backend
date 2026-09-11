@@ -723,7 +723,7 @@ AI istifadəçinin "son yüklənən sənədlər", "invoice faylı", "maaş haqq�
 
 ### 🔹 9.6 AI (Layer 3) `<ferqli>` Təhlili Və Accuracy Hesablanması
 - Layer 1 OCR və Text Layer arasında fərq tapıldıqda, həmin gizli mətnlər AI-a `<ferqli>gizli mətn</ferqli>` teqləri içərisində göndərilir.
-- Layer 3 `layer3_llmReview.explanation` sahəsində ML qatının yox, LLM-in **öz hesabladığı müstəqil accuracy/confidence** faizi qaytarılır. LLM-ə gizli mətn barədə niyə təhlükə olub-olmadığını detalı ilə izah etmək məcburiyyəti qoyulub.
+- Layer 3 `layer3_llmReview.aiExplanation` sahəsində ML qatının yox, LLM-in **öz hesabladığı müstəqil accuracy/confidence** faizi qaytarılır. LLM-ə gizli mətn barədə niyə təhlükə olub-olmadığını detalı ilə izah etmək məcburiyyəti qoyulub.
 
 ### 🔹 9.7 Bütün Test (Mock) Məlumatlarının Silinməsi
 - Bütün test `mock-storage` URL-ləri ləğv edildi, xüsusən `cleanInjection` artıq həqiqi URL qaytarır.
