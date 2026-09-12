@@ -88,7 +88,6 @@ const router = Router();
 router.get('/models/active', catchAsync(getActiveModelController));
 router.get('/models/all-models', catchAsync(getAllModelsController));
 router.post('/models/change-version/:version_id', catchAsync(changeModelVersionController));
-router.post('/models/change-version', catchAsync(changeModelVersionController));
 router.post('/models/train', catchAsync(trainModelController));
 
 export default router;
