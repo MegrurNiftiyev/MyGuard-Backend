@@ -265,8 +265,8 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       fullText: layer1Result.pdfTextLayer || filename,
     });
 
-    let layer2Result: Layer2ClassifierResult;
-
+    let layer2Result: Layer2ClassifierResult | null = null;
+    
     if (fastApiResult) {
       layer2Result = {
         classification: fastApiResult.label === 'injection' ? 'High Risk' : fastApiResult.label === 'suspicious' ? 'Suspicious' : 'Safe',
@@ -275,25 +275,29 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
         riskCategory: fastApiResult.label === 'injection' ? 'Prompt Injection' : 'None',
         matchedSignatures: [],
       };
+    } else if (process.env.USE_MOCK_LAYER2 === 'true') {
+      console.log(`[Pipeline Step 2/3] FastAPI unavailable. Using mock Layer 2 classifier because USE_MOCK_LAYER2=true.`);
+      layer2Result = await runMockLayer2Classifier(filename, layer1Result.hiddenTextDetected);
     } else {
-      console.log(`[Pipeline Step 2/3] FastAPI unavailable/cold-starting. Falling back to local Layer 2 classifier.`);
-      layer2Result = await runMockLayer2Classifier(layer1Result.pdfTextLayer || filename, layer1Result.hiddenTextDetected);
+      console.warn(`[Pipeline Step 2/3] FastAPI Layer 2 classification unavailable & mock disabled.`);
     }
 
     await sleep(500);
     
-    const isInjection = layer2Result.isInjection;
-    const confidence = layer2Result.confidence;
-    const mlMsg = isInjection 
-      ? translate('ml_injection_detected', lang) 
-      : translate('ml_safe_message', lang);
+    const isInjection = layer2Result?.isInjection || false;
+    const confidence = layer2Result?.confidence || 0;
+    const mlMsg = !layer2Result 
+      ? translate('ml_unavailable_message', lang) || 'Analiz natamamdır (ML servisi əlçatmazdır)'
+      : isInjection 
+        ? translate('ml_injection_detected', lang) 
+        : translate('ml_safe_message', lang);
 
-    console.log(`[Pipeline Step 2/3: Layer 2 Result] Label=${layer2Result.classification} | IsInjection=${isInjection} | Conf=${confidence} (+${Date.now() - pipelineStartTime}ms)`);
+    console.log(`[Pipeline Step 2/3: Layer 2 Result] Label=${layer2Result?.classification || 'N/A'} | IsInjection=${isInjection} | Conf=${confidence} (+${Date.now() - pipelineStartTime}ms)`);
 
     await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { 
-      stepStatus: 'completed',
-      errorDetail: null,
-      layer2_classification: {
+      stepStatus: !layer2Result ? 'error' : 'completed',
+      errorDetail: !layer2Result ? 'FastAPI classifier unavailable' : null,
+      layer2_classification: !layer2Result ? null : {
         label: isInjection ? 'injection' : 'safe',
         confidence,
         accuracy: 0.98,
