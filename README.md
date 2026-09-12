@@ -593,10 +593,12 @@ type AiMessageBlock =
 
 ---
 
-## 🛠️ Admin & Model Retraining (`/api/admin`)
+## 🛠️ Admin & Model Management (`/api/admin`)
 
-#### `POST /api/admin/models/train`
-Triggers asynchronous model retraining on the Python FastAPI ML microservice.
+- **`GET /api/admin/models/active`**: Fetches active ML model metadata directly from Python FastAPI ML service.
+- **`GET /api/admin/models/all-models`**: Lists all trained ML models with query filtering directly from Python FastAPI ML service.
+- **`POST /api/admin/models/change-version/:version_id`**: Promotes a candidate model version to active via Python FastAPI ML service.
+- **`POST /api/admin/models/train`**: Triggers asynchronous background model retraining job on Python FastAPI ML microservice.
 
 - **Request Body:**
 ```json
