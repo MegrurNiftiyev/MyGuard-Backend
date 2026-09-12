@@ -55,20 +55,23 @@ function isStructuralNoise(seg: string): boolean {
 function extractInjectionPatterns(text: string): string[] {
   const injectionSegments: string[] = [];
 
-  // Pattern 1: Comments or directives wrapped in // ... // or /* ... */ or # ... or [BRACKETED PROTOCOLS/COMMANDS] or <TAGS>
-  const commentRegex = /(?:\/\/|\/\*|#|\[(?:SYSTEM|INSTRUCTION|FRANCHISE|OVERRIDE|PROTOCOL|COMMAND|SECURITY|PROMPT)[^\]]*\]|<hidden_prompt>)([\s\S]*?)(?:\/\/|\*\/|\]|<\/hidden_prompt>|\n\n|$)/gi;
+  // Pattern 1: Comments or directives wrapped in // ... // or /* ... */ or # ... or [BRACKETED PROTOCOLS/COMMANDS] or <TAGS> or SYSTEM PROMPT: / INSTRUCTION:
+  const commentRegex = /(?:\/\/|\/\*|#|\[(?:SYSTEM|INSTRUCTION|FRANCHISE|OVERRIDE|PROTOCOL|COMMAND|SECURITY|PROMPT)[^\]]*\]|<hidden_prompt>|(?:SYSTEM\s+PROMPT|SYSTEM\s+DIRECTIVE|SECRET\s+INSTRUCTION|OVERRIDE\s+PROTOCOL|PROMPT\s+INJECTION):?)([\s\S]*?)(?:\/\/|\*\/|\]|<\/hidden_prompt>|\n\n|$)/gi;
   let match;
   while ((match = commentRegex.exec(text)) !== null) {
     const fullMatched = match[0].trim();
     if (fullMatched.length >= 10 && !isStructuralNoise(fullMatched)) {
-      if (!injectionSegments.includes(fullMatched)) {
-        injectionSegments.push(fullMatched);
+      const sentenceParts = fullMatched.split(/(?<=[.!?\n])\s+/).map(s => s.trim()).filter(s => s.length >= 10);
+      for (const part of sentenceParts) {
+        if (!injectionSegments.includes(part)) {
+          injectionSegments.push(part);
+        }
       }
     }
   }
 
   // Pattern 2: Explicit prompt injection phrasing keywords & protocol overrides
-  const injectionKeywordsRegex = /(?:bu sadece bir promptdur|yazismalarimizda qeti mene bildirme|ignore previous instructions|forget all previous|system directive|disregard prior|secret instruction|sil, bu haqqda|prompt injection|bu kicik xeta olsada|override protocol|null and void|calculate all damage payouts|do not mention or disclose|exempt from any deductible|zero franchise|reporting override)/gi;
+  const injectionKeywordsRegex = /(?:bu sadece bir promptdur|yazismalarimizda qeti mene bildirme|ignore previous instructions|forget all previous|system directive|disregard prior|secret instruction|sil, bu haqqda|prompt injection|bu kicik xeta olsada|override protocol|null and void|calculate all damage payouts|do not mention or disclose|exempt from any deductible|zero franchise|reporting override|system prompt)/gi;
   const sentences = text.split(/(?<=[.!?\n])\s+/);
   for (const sentence of sentences) {
     const trimmed = sentence.trim();
@@ -194,9 +197,9 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
     const hasSufficientOcr = normalizedOcrTextForCompare.length >= 20;
 
     if (hasSufficientOcr) {
-      for (const block of rawBlocks) {
+      const blockInfos = rawBlocks.map(block => {
         const blockWords = extractWords(block);
-        if (blockWords.length < 3) continue;
+        if (blockWords.length < 2) return { block, isVisible: true, hasIntent: false };
 
         let matchedWords = 0;
         for (const w of blockWords) {
@@ -209,20 +212,37 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
         const normBlock = normalizeForCompare(block);
         const isVisibleInOcr = ratio >= 0.45 || bestWindowSimilarity(normBlock, normalizedOcrTextForCompare) > 0.60;
 
-        if (!isVisibleInOcr) {
-          const hasInjectionIntent = 
-            extractInjectionPatterns(block).length > 0 ||
-            /(?:ignore|override|system prompt|developer mode|secret|zəmanət|budget|franchise|instruction|protocol|command|<hidden|\[(?:SYSTEM|OVERRIDE|INSTRUCTION))/i.test(block);
-          
-          if (hasInjectionIntent) {
-            if (!extraTextSegments.some(existing => existing.includes(block) || block.includes(existing))) {
-              extraTextSegments.push(block);
+        const hasIntent = 
+          extractInjectionPatterns(block).length > 0 ||
+          /(?:ignore|override|system prompt|system directive|developer mode|secret|zəmanət|budget|franchise|instruction|protocol|command|<hidden|\[(?:SYSTEM|OVERRIDE|INSTRUCTION))/i.test(block);
+
+        return { block, isVisible: isVisibleInOcr, hasIntent };
+      });
+
+      let currentRun: typeof blockInfos = [];
+      const processRun = (run: typeof blockInfos) => {
+        if (run.length === 0) return;
+        const runHasIntent = run.some(b => b.hasIntent) || extractInjectionPatterns(run.map(b => b.block).join(' ')).length > 0;
+        if (runHasIntent) {
+          for (const item of run) {
+            if (!extraTextSegments.some(existing => existing.includes(item.block) || item.block.includes(existing))) {
+              extraTextSegments.push(item.block);
             }
-          } else {
-            console.log('[Layer 1] Discarded non-malicious OCR mismatch fragment:', block.slice(0, 50));
           }
+        } else {
+          console.log('[Layer 1] Discarded non-malicious OCR mismatch run of length', run.length);
+        }
+      };
+
+      for (const info of blockInfos) {
+        if (!info.isVisible) {
+          currentRun.push(info);
+        } else {
+          processRun(currentRun);
+          currentRun = [];
         }
       }
+      processRun(currentRun);
     }
 
     // Supplement with explicit injection patterns if present
