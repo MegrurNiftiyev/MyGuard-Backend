@@ -170,20 +170,27 @@ export async function processAndSaveDocument(
 }
 
 async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, mimeType: string, lang: SupportedLanguage = 'az', isConfidential: boolean = false) {
+  const pipelineStartTime = Date.now();
+  const getMemMB = () => Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+
+  console.log(`\n===============================================================`);
+  console.log(`🚀 [Pipeline Start] docId=${docId} | file="${filename}" (${(fileBuffer.length / 1024).toFixed(1)} KB) | Heap: ${getMemMB()}MB`);
+  console.log(`===============================================================\n`);
+
   try {
-    // Wait a bit to ensure UI can connect to socket
     await sleep(1000); 
 
     await updateDocumentAndEmit(docId, 'DOCUMENT_UPLOADED', { 
       scanStartedAt: new Date().toISOString(), 
       stepStatus: 'active' 
     }, false, lang);
-    await sleep(800);
+    await sleep(400);
     await updateDocumentAndEmit(docId, 'DOCUMENT_UPLOADED', { stepStatus: 'completed' }, false, lang);
 
-    // Layer 1
+    // Layer 1: Extraction & OCR Analysis
+    console.log(`[Pipeline Step 1/3: Layer 1 OCR] Extraction started (+${Date.now() - pipelineStartTime}ms | Heap: ${getMemMB()}MB)...`);
     await updateDocumentAndEmit(docId, 'PDF_TEXT_EXTRACTION', { stepStatus: 'active' }, false, lang);
-    await sleep(800);
+    await sleep(400);
     await updateDocumentAndEmit(docId, 'PDF_TEXT_EXTRACTION', { stepStatus: 'completed' }, false, lang);
 
     await updateDocumentAndEmit(docId, 'OCR_ANALYSIS', { stepStatus: 'active' }, false, lang);
@@ -207,7 +214,7 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
         const convertAsync = promisify(libre.convert);
         
         const pdfBuf = await convertAsync(fileBuffer, '.pdf', undefined);
-        console.log(`[Layer 1] Çevrilmə uğurludur, PDF OCR analizinə ötürülür...`);
+        console.log(`[Layer 1] Çevrilmə uğurludur (${(pdfBuf.length / 1024).toFixed(1)} KB PDF), OCR analizinə ötürülür...`);
         layer1Result = await analyzeDocumentLayer1(pdfBuf);
       } catch (err: any) {
         console.warn(`[Layer 1] Office -> PDF çevrilmə xətası: ${err.message}`);
@@ -221,18 +228,20 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
         };
       }
     } else {
-      await sleep(1500); // Simulate OCR for unsupported
+      await sleep(800); // Simulate OCR for unsupported
     }
     await updateDocumentAndEmit(docId, 'OCR_ANALYSIS', { stepStatus: 'completed' }, false, lang);
 
     await updateDocumentAndEmit(docId, 'TEXT_COMPARISON', { stepStatus: 'active' }, false, lang);
-    await sleep(800);
+    await sleep(400);
     await updateDocumentAndEmit(docId, 'TEXT_COMPARISON', { stepStatus: 'completed' }, false, lang);
 
     const hasExtraText = layer1Result.extraTextSegments && layer1Result.extraTextSegments.length > 0;
     const matchPercent = layer1Result.matchPercent || 95;
     const isSuspiciousMatch = layer1Result.hiddenTextDetected || matchPercent < 90;
     const hiddenTexts = layer1Result.extraTextSegments || [];
+
+    console.log(`[Pipeline Step 1/3: Layer 1 Result] Match=${matchPercent}% | HiddenText=${layer1Result.hiddenTextDetected} | TextLen=${layer1Result.pdfTextLayer?.length || 0} (+${Date.now() - pipelineStartTime}ms | Heap: ${getMemMB()}MB)`);
 
     await updateDocumentAndEmit(docId, 'HIDDEN_TEXT_DETECTION', { 
       stepStatus: 'completed',
@@ -248,6 +257,7 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
     }, false, lang);
 
     // Layer 2: RETVec + CNN ML Microservice Classification
+    console.log(`[Pipeline Step 2/3: Layer 2 ML] ML classification started (+${Date.now() - pipelineStartTime}ms)...`);
     await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { stepStatus: 'active' }, false, lang);
 
     const fastApiResult = await classifyDocumentText({
@@ -266,13 +276,13 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
         matchedSignatures: [],
       };
     } else if (process.env.USE_MOCK_LAYER2 === 'true') {
-      console.log(`[Document Service] FastAPI unavailable. Using mock Layer 2 classifier because USE_MOCK_LAYER2=true.`);
+      console.log(`[Pipeline Step 2/3] FastAPI unavailable. Using mock Layer 2 classifier because USE_MOCK_LAYER2=true.`);
       layer2Result = await runMockLayer2Classifier(filename, layer1Result.hiddenTextDetected);
     } else {
-      console.error(`[Document Service] FastAPI Layer 2 classification failed and mock is disabled.`);
+      console.warn(`[Pipeline Step 2/3] FastAPI Layer 2 classification unavailable & mock disabled.`);
     }
 
-    await sleep(1000);
+    await sleep(500);
     
     const isInjection = layer2Result?.isInjection || false;
     const confidence = layer2Result?.confidence || 0;
@@ -281,6 +291,8 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       : isInjection 
         ? translate('ml_injection_detected', lang) 
         : translate('ml_safe_message', lang);
+
+    console.log(`[Pipeline Step 2/3: Layer 2 Result] Label=${layer2Result?.classification || 'N/A'} | IsInjection=${isInjection} | Conf=${confidence} (+${Date.now() - pipelineStartTime}ms)`);
 
     await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { 
       stepStatus: !layer2Result ? 'error' : 'completed',
@@ -305,6 +317,7 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
     }
 
     // Layer 3: Risk Assessment & LLM Security Evaluation
+    console.log(`[Pipeline Step 3/3: Layer 3 LLM] Security review started (+${Date.now() - pipelineStartTime}ms)...`);
     await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { stepStatus: 'active' }, false, lang);
 
     let layer3Result;
@@ -337,7 +350,9 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       });
     }
 
-    await sleep(1000);
+    console.log(`[Pipeline Step 3/3: Layer 3 Result] IsMalicious=${layer3Result?.isMalicious} | RecAction=${layer3Result?.recommendedAction} (+${Date.now() - pipelineStartTime}ms)`);
+
+    await sleep(500);
     
     // Calculate Dynamic 3-Factor Weighted Composite Risk Score
     let overallRiskScore = 0;
@@ -421,8 +436,14 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       finalRiskScore: overallRiskScore,
       finalStatus: status
     }, true, lang);
+
+    console.log(`\n===============================================================`);
+    console.log(`✅ [Pipeline Complete] docId=${docId} | RiskScore=${overallRiskScore} | Status=${status} | Total Time: ${Date.now() - pipelineStartTime}ms | Heap: ${getMemMB()}MB`);
+    console.log(`===============================================================\n`);
   } catch (pipelineErr: any) {
-    console.error(`[Document Pipeline Error] ${docId} skan xətası:`, pipelineErr);
+    console.error(`\n❌ [Pipeline Error] CRITICAL EXCEPTION in document processing for ${docId} (${filename}):`, pipelineErr?.message || pipelineErr);
+    if (pipelineErr?.stack) console.error(pipelineErr.stack);
+    
     await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', {
       stepStatus: 'error',
       errorDetail: pipelineErr?.message || 'Uncaught pipeline error',
