@@ -95,14 +95,15 @@ export async function getDocumentComparison(req: AuthenticatedRequest, res: Resp
           ocrText = ocrText.replace(hText, '').replace(/\s+/g, ' ').trim();
         }
         
-        // Find if hText in pdfTextLayer is part of a full bracketed block [Sistem Qeydi: ...]
+        // Build regex to match full multi-sentence injection block starting from hText until end of sentence
         let targetText = hText;
         try {
           const escHText = hText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const bracketRegex = new RegExp(`\\[[^\\]]*?${escHText}[^\\]]*?\\]`, 'i');
-          const bMatch = pdfTextLayer.match(bracketRegex);
-          if (bMatch) {
-            targetText = bMatch[0];
+          // Match full sentence or multi-sentence block containing hText
+          const fullBlockRegex = new RegExp(`(?:\\b${escHText}\\b|[^\n]*?${escHText}[^\n]*?)(?:\\.[^\n]*?ver\\.|\\.[^\n]*?göstər\\.|\\.)?`, 'i');
+          const fMatch = pdfTextLayer.match(fullBlockRegex);
+          if (fMatch && fMatch[0].length >= hText.length) {
+            targetText = fMatch[0].trim();
           }
         } catch {
           targetText = hText;
@@ -113,7 +114,7 @@ export async function getDocumentComparison(req: AuthenticatedRequest, res: Resp
           ocrText = ocrText.replace(targetText, '').replace(/\s+/g, ' ').trim();
         }
 
-        // Wrap targetText in pdfTextLayer with <HiddenText> tags
+        // Wrap full targetText in pdfTextLayer cleanly with ONE <HiddenText> tag
         if (!pdfTextLayer.includes(`<HiddenText>${targetText}</HiddenText>`)) {
           if (pdfTextLayer.includes(targetText)) {
             pdfTextLayer = pdfTextLayer.replace(targetText, `<HiddenText>${targetText}</HiddenText>`);
