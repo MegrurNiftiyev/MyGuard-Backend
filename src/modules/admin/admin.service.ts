@@ -1,33 +1,4 @@
-import { db, isFirebaseInitialized } from '../../config/firebase.js';
-import { COLLECTIONS } from '../../config/collections.js';
-import { ModelConfig, AgentActivityLog } from './admin.schema.js';
-
-const defaultModels: ModelConfig[] = [
-  {
-    id: 'mod-1',
-    name: 'STANDARD AI (Cloud Enterprise)',
-    mode: 'STANDARD AI',
-    status: 'Active',
-    isLocal: false,
-    lastUpdate: 'Bugün 12:00',
-    provider: 'Cloud High-Performance LLM',
-    description: 'Aşağı və orta həssaslıqlı sənədlər üçün yüksək sürətli xarici bulud modeli.',
-    latency: '140ms',
-    maxContext: '128k tokens',
-  },
-  {
-    id: 'mod-2',
-    name: 'CONFIDENTIAL AI (On-Premise Defense)',
-    mode: 'CONFIDENTIAL AI',
-    status: 'Active',
-    isLocal: true,
-    lastUpdate: 'Bugün 09:30',
-    provider: 'Local Air-Gapped Model',
-    description: 'Yüksək məxfiliyə malik və daxili müdafiə sənədləri üçün lokal serverdə çalışan izolyasiya olunmuş AI modeli.',
-    latency: '220ms',
-    maxContext: '64k tokens',
-  },
-];
+import { AgentActivityLog } from './admin.schema.js';
 
 const defaultAgentActions: AgentActivityLog[] = [
   {
@@ -65,49 +36,6 @@ const defaultAgentActions: AgentActivityLog[] = [
   },
 ];
 
-export async function getModelVersions(): Promise<ModelConfig[]> {
-  if (isFirebaseInitialized && db) {
-    try {
-      const snapshot = await db.collection(COLLECTIONS.MODEL_VERSIONS).get();
-      if (!snapshot.empty) {
-        const models: ModelConfig[] = [];
-        snapshot.forEach((doc: any) => models.push(doc.data() as ModelConfig));
-        return models;
-      }
-    } catch (err) {
-      console.warn('[Admin Service] Firestore get models error:', err);
-    }
-  }
-
-  return defaultModels;
-}
-
 export async function getAgentActions(): Promise<AgentActivityLog[]> {
   return defaultAgentActions;
-}
-
-export async function createModelVersion(name: string, provider: string, mode: any): Promise<ModelConfig> {
-  const modelId = 'mod-' + Date.now();
-  const newModel: ModelConfig = {
-    id: modelId,
-    name,
-    mode: mode || 'STANDARD AI',
-    status: 'Active',
-    isLocal: false,
-    lastUpdate: 'İndi',
-    provider: provider || 'Custom LLM Provider',
-    description: 'Yenilənmiş təhlükəsizlik modeli',
-    latency: '150ms',
-    maxContext: '128k tokens',
-  };
-
-  if (isFirebaseInitialized && db) {
-    try {
-      await db.collection(COLLECTIONS.MODEL_VERSIONS).doc(modelId).set(newModel);
-    } catch (err) {
-      console.warn('[Admin Service] Firestore set model error:', err);
-    }
-  }
-
-  return newModel;
 }
