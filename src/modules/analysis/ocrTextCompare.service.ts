@@ -94,38 +94,31 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
     let normalizedOcrText = '';
     let normalizedOcrTextForCompare = '';
     try {
-      let images: Buffer[] = [];
-      try {
-        const { createCanvas } = await import('@napi-rs/canvas');
-        for (let i = 1; i <= numPages; i++) {
+      const { createCanvas } = await import('@napi-rs/canvas');
+      const maxPagesToScan = Math.min(numPages, 10);
+      console.log(`[Layer 1] @napi-rs/canvas və OCR streaming analizi başladılır (${maxPagesToScan} səhifə)...`);
+
+      for (let i = 1; i <= maxPagesToScan; i++) {
+        try {
           const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 2 });
+          const viewport = page.getViewport({ scale: 1.2 });
           const canvas = createCanvas(viewport.width, viewport.height);
           const ctx = canvas.getContext('2d');
           await page.render({ canvasContext: ctx as any, canvas: canvas as any, viewport }).promise;
-          images.push(canvas.toBuffer('image/png'));
-        }
-        console.log(`[Layer 1] @napi-rs/canvas ilə ${images.length} səhifə şəkildə rendered edildi.`);
-      } catch (canvasErr: any) {
-        console.warn('[Layer 1] @napi-rs/canvas xətası, pdf-img-convert fallback yoxlanılır:', canvasErr?.message);
-        try {
-          const pdf2img = await import('pdf-img-convert');
-          const converted: any = await pdf2img.default.convert(pdfBuffer, { scale: 2 });
-          images = (converted as any[]).map((img: any) => Buffer.from(img));
-        } catch (imgErr: any) {
-          console.warn('[Layer 1] Canvas and pdf-img-convert unavailable. Using text-layer fallback:', imgErr?.message);
-        }
-      }
 
-      if (images.length > 0) {
-        if (env.GOOGLE_VISION_API_KEY) {
-          console.log(`[Layer 1] Google Cloud Vision API istifadə edilir (${images.length} səhifə)...`);
-          for (let i = 0; i < images.length; i++) {
+          const imgBuf = canvas.toBuffer('image/png');
+          let pageText = '';
+
+          if (env.GOOGLE_VISION_API_KEY) {
             try {
-              const base64Image = images[i].toString('base64');
+              const base64Image = imgBuf.toString('base64');
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 10000);
+
               const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${env.GOOGLE_VISION_API_KEY}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
                 body: JSON.stringify({
                   requests: [
                     {
@@ -136,29 +129,29 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
                   ]
                 })
               });
+              clearTimeout(timeoutId);
 
               if (response.ok) {
                 const data = await response.json();
-                const text = data.responses[0]?.fullTextAnnotation?.text || '';
-                fullOcrText += text + ' ';
-              } else {
-                const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng', { langPath: tessdataPath, gzip: true });
-                fullOcrText += text + ' ';
+                pageText = data.responses[0]?.fullTextAnnotation?.text || '';
               }
-            } catch (tessErr: any) {
-              console.warn(`[Layer 1] OCR xətası (səhifə ${i + 1}): ${tessErr?.message || tessErr}`);
+            } catch (gVisErr: any) {
+              console.warn(`[Layer 1] Google Vision OCR xətası (səhifə ${i}):`, gVisErr?.message);
             }
           }
-        } else {
-          console.log(`[Layer 1] GOOGLE_VISION_API_KEY tapılmadı, Tesseract (aze+eng) istifadə edilir...`);
-          for (let i = 0; i < images.length; i++) {
+
+          if (!pageText) {
             try {
-              const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng', { langPath: tessdataPath, gzip: true });
-              fullOcrText += text + ' ';
+              const { data: { text } } = await Tesseract.recognize(imgBuf, 'aze+eng', { langPath: tessdataPath, gzip: true });
+              pageText = text;
             } catch (tessErr: any) {
-              console.warn(`[Layer 1] Tesseract OCR xətası (səhifə ${i + 1}): ${tessErr?.message || tessErr}`);
+              console.warn(`[Layer 1] Tesseract OCR xətası (səhifə ${i}):`, tessErr?.message);
             }
           }
+
+          fullOcrText += pageText + ' ';
+        } catch (pageErr: any) {
+          console.warn(`[Layer 1] Səhifə ${i} render/OCR xətası:`, pageErr?.message);
         }
       }
 
