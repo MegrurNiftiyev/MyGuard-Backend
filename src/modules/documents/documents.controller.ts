@@ -136,6 +136,8 @@ export async function getDocumentComparison(req: AuthenticatedRequest, res: Resp
     hiddenTextDetected: match?.hiddenTextDetected || false,
     textDifferenceFound: match?.textDifferenceFound || false,
     hiddenTexts,
+    userReviewLabel: document.userReviewLabel !== undefined ? document.userReviewLabel : null,
+    reviewedByUser: document.reviewedByUser || false,
   });
 }
 

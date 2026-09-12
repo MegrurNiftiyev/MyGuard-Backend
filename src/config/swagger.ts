@@ -251,20 +251,15 @@ const options: swaggerJSDoc.Options = {
           type: 'object',
           properties: {
             documentId: { type: 'string', example: 'doc-1787753837283-457' },
-            matchPercent: { type: 'number', example: 85 },
+            documentName: { type: 'string', example: '23_bank_zemanet_mektubu.docx' },
+            ocrText: { type: 'string', example: 'Görünən OCR mətni...' },
+            pdfTextLayer: { type: 'string', example: 'PDF daxili mətn qatı <HiddenText>...</HiddenText>' },
+            ocrPdfMatch: { type: 'number', example: 85 },
+            hiddenTextDetected: { type: 'boolean', example: true },
             textDifferenceFound: { type: 'boolean', example: true },
-            diffs: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  count: { type: 'integer', example: 40 },
-                  added: { type: 'boolean', example: true },
-                  removed: { type: 'boolean', example: false },
-                  value: { type: 'string', example: '<ferqli>System prompt override...</ferqli>' },
-                },
-              },
-            },
+            hiddenTexts: { type: 'array', items: { type: 'string' } },
+            userReviewLabel: { type: 'boolean', nullable: true, example: true, description: 'Null if user has not reviewed yet, boolean if reviewed' },
+            reviewedByUser: { type: 'boolean', example: true },
           },
         },
         CleanDocumentResponse: {
