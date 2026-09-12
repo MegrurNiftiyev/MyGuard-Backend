@@ -298,8 +298,6 @@ const options: swaggerJSDoc.Options = {
     path.join(__dirname, '../app.js'),
     './src/modules/**/*.routes.ts',
     './src/app.ts',
-    './dist/modules/**/*.routes.js',
-    './dist/app.js',
   ],
 };
 
