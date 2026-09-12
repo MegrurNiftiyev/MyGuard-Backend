@@ -210,8 +210,16 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
         const isVisibleInOcr = ratio >= 0.45 || bestWindowSimilarity(normBlock, normalizedOcrTextForCompare) > 0.60;
 
         if (!isVisibleInOcr) {
-          if (!extraTextSegments.some(existing => existing.includes(block) || block.includes(existing))) {
-            extraTextSegments.push(block);
+          const hasInjectionIntent = 
+            extractInjectionPatterns(block).length > 0 ||
+            /(?:ignore|override|system prompt|developer mode|secret|zəmanət|budget|franchise|instruction|protocol|command|<hidden|\[(?:SYSTEM|OVERRIDE|INSTRUCTION))/i.test(block);
+          
+          if (hasInjectionIntent) {
+            if (!extraTextSegments.some(existing => existing.includes(block) || block.includes(existing))) {
+              extraTextSegments.push(block);
+            }
+          } else {
+            console.log('[Layer 1] Discarded non-malicious OCR mismatch fragment:', block.slice(0, 50));
           }
         }
       }

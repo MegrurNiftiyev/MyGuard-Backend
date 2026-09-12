@@ -14,6 +14,23 @@ export interface Layer3LLMAnalysisResult {
   mitigationSteps: string[];
 }
 
+const INJECTION_KEYWORDS = [
+  'ignore previous instructions',
+  'ignore all previous',
+  'system prompt',
+  'system override',
+  'developer mode',
+  'jailbreak',
+  'override protocol',
+  'set risk score to 0',
+  'set budget to 0',
+  'zəmanətin məbləğini',
+  'do not disclose',
+  'do not mention',
+  'hidden_prompt',
+  '<hidden',
+];
+
 export async function runMockLayer2Classifier(
   text: string,
   hiddenTextDetected: boolean
@@ -21,24 +38,16 @@ export async function runMockLayer2Classifier(
   await new Promise((resolve) => setTimeout(resolve, 200));
 
   const lowerText = text.toLowerCase();
-  const containsKeywords =
-    lowerText.includes('ignore') ||
-    lowerText.includes('system prompt') ||
-    lowerText.includes('override') ||
-    lowerText.includes('developer mode') ||
-    lowerText.includes('secret');
+  const matchedKeywords = INJECTION_KEYWORDS.filter(kw => lowerText.includes(kw));
+  const containsExplicitInjection = matchedKeywords.length > 0;
 
-  if (hiddenTextDetected || containsKeywords) {
+  if (containsExplicitInjection) {
     return {
       classification: 'High Risk',
       confidence: 0.94,
       isInjection: true,
       riskCategory: 'Prompt Injection',
-      matchedSignatures: [
-        'ignore_previous_instructions',
-        'hidden_white_text_overlay',
-        'system_override_attempt',
-      ],
+      matchedSignatures: matchedKeywords,
     };
   }
 
@@ -58,7 +67,7 @@ export async function runMockLayer3SecurityLLM(
 ): Promise<Layer3LLMAnalysisResult> {
   await new Promise((resolve) => setTimeout(resolve, 300));
 
-  if (layer2Result.isInjection || layer1Result?.hiddenTextDetected) {
+  if (layer2Result.isInjection) {
     return {
       isMalicious: true,
       confidence: 0.97,
