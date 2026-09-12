@@ -192,6 +192,9 @@ export async function evaluateLayer3SecurityLLM(
           // Clean any stray tags from AI explanation
           aiExplanation = aiExplanation.replace(/<\/?(?:ferqli|HiddenText)>/gi, '').trim();
 
+          // Enforce bold markdown quotes **"..."** on quoted text snippets if LLM used single quotes
+          aiExplanation = aiExplanation.replace(/(?:\*\*)?['"“‘]([^'"”’]{5,120})['"”’](?:\*\*)?/gi, '**"$1"**');
+
           if (aiExplanation.length >= 20) {
             return {
               isMalicious: Boolean(parsed.isMalicious),
