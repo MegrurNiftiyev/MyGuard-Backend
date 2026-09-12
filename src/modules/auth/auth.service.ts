@@ -638,7 +638,7 @@ async function revokeAllSessionsForUser(userId: string): Promise<void> {
 }
 
 /**
- * 1. POST /api/auth/forgot-password -> sends OTP (60s TTL)
+ * 1. POST /api/auth/forgot-password -> sends OTP (5m TTL)
  */
 export async function forgotPassword(dto: ForgotPasswordDto): Promise<{ success: boolean; message: string }> {
   const identifier = dto.identifier ? dto.identifier.trim() : '';
@@ -650,21 +650,22 @@ export async function forgotPassword(dto: ForgotPasswordDto): Promise<{ success:
   checkHourlyRateLimit(normalizedId);
 
   const user = await resolveUserByIdentifier(identifier);
-
-  if (user) {
-    const { otp, otpHash } = generateOtp();
-    await savePasswordResetOtp(user.uid, otpHash, Date.now() + 60 * 1000); // 60 seconds
-    await sendOtpEmail(user.email, otp, user.fullName);
+  if (!user) {
+    throw new AppError('Daxil edilən FİN kod və ya E-poçt ünvanı ilə istifadəçi tapılmadı.', 404);
   }
+
+  const { otp, otpHash } = generateOtp();
+  await savePasswordResetOtp(user.uid, otpHash, Date.now() + 5 * 60 * 1000); // 5 minutes
+  await sendOtpEmail(user.email, otp, user.fullName);
 
   return {
     success: true,
-    message: 'Əgər bu hesab mövcuddursa, OTP kodu göndərildi.',
+    message: 'OTP kodu uğurla göndərildi.',
   };
 }
 
 /**
- * 2. POST /api/auth/resend-otp -> invalidates prior OTP, sends fresh OTP (60s TTL)
+ * 2. POST /api/auth/resend-otp -> invalidates prior OTP, sends fresh OTP (5m TTL)
  */
 export async function resendOtp(dto: ResendOtpDto): Promise<{ success: boolean; message: string }> {
   const identifier = dto.identifier ? dto.identifier.trim() : '';
@@ -685,18 +686,19 @@ export async function resendOtp(dto: ResendOtpDto): Promise<{ success: boolean; 
   checkHourlyRateLimit(normalizedId);
 
   const user = await resolveUserByIdentifier(identifier);
-
-  if (user) {
-    await invalidateExistingOtps(user.uid);
-    const { otp, otpHash } = generateOtp();
-    await savePasswordResetOtp(user.uid, otpHash, Date.now() + 60 * 1000); // 60 seconds
-    await sendOtpEmail(user.email, otp, user.fullName);
-    resendCooldownMap.set(normalizedId, now);
+  if (!user) {
+    throw new AppError('Daxil edilən FİN kod və ya E-poçt ünvanı ilə istifadəçi tapılmadı.', 404);
   }
+
+  await invalidateExistingOtps(user.uid);
+  const { otp, otpHash } = generateOtp();
+  await savePasswordResetOtp(user.uid, otpHash, Date.now() + 5 * 60 * 1000); // 5 minutes
+  await sendOtpEmail(user.email, otp, user.fullName);
+  resendCooldownMap.set(normalizedId, now);
 
   return {
     success: true,
-    message: 'Yeni OTP kodu göndərildi.',
+    message: 'Yeni OTP kodu uğurla göndərildi.',
   };
 }
 

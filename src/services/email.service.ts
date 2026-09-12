@@ -9,7 +9,7 @@ export async function sendOtpEmail(email: string, otp: string, fullName?: string
   console.log(`[EMAIL SERVICE] 🔐 PASSWORD RESET OTP SENT`);
   console.log(`To: ${fullName || 'User'} <${email}>`);
   console.log(`OTP Code: ${otp}`);
-  console.log(`Valid for: 60 seconds`);
+  console.log(`Valid for: 5 minutes (300 seconds)`);
   console.log(`=============================================================\n`);
 
   if (env.RESEND_API_KEY) {
@@ -32,7 +32,7 @@ export async function sendOtpEmail(email: string, otp: string, fullName?: string
               <div style="font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #2b6cb0; margin: 20px 0; text-align: center;">
                 ${otp}
               </div>
-              <p style="color: #718096; font-size: 14px;">Bu kod yalnız <strong>60 saniyə</strong> müddətində etibarlıdır.</p>
+              <p style="color: #718096; font-size: 14px;">Bu kod yalnız <strong>5 dəqiqə</strong> müddətində etibarlıdır.</p>
               <p style="color: #e53e3e; font-size: 13px;">Təhlükəsizlik xəbərdarlığı: Bu kodu heç kimə təqdim etməyin.</p>
             </div>
           `,

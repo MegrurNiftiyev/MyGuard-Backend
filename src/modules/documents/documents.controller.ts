@@ -81,15 +81,47 @@ export async function getDocumentComparison(req: AuthenticatedRequest, res: Resp
   const match = document.layer1_ocrTextMatch;
   const hiddenTexts = match?.hiddenTexts || (match as any)?.extraTextSegments || [];
   
-  let ocrText = match?.ocrText || match?.pdfTextLayer || translate('no_data', lang);
+  let ocrText = match?.ocrText || translate('no_data', lang);
+  let pdfTextLayer = match?.pdfTextLayer || translate('no_data', lang);
+
+  // Clean ocrText so it never has delimiter tags
+  ocrText = ocrText.replace(/<\/?(?:ferqli|HiddenText)>/gi, '').trim();
 
   if (hiddenTexts.length > 0) {
     for (const hText of hiddenTexts) {
-      if (hText && !ocrText.includes(`<ferqli>${hText}</ferqli>`)) {
+      if (hText) {
+        // Strip hidden segment from ocrText if it accidentally spilled in
         if (ocrText.includes(hText)) {
-          ocrText = ocrText.replace(hText, `<ferqli>${hText}</ferqli>`);
-        } else {
-          ocrText += `\n<ferqli>${hText}</ferqli>`;
+          ocrText = ocrText.replace(hText, '').replace(/\s+/g, ' ').trim();
+        }
+        
+        // Find if hText in pdfTextLayer is part of a full bracketed block [Sistem Qeydi: ...]
+        let targetText = hText;
+        try {
+          const escHText = hText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const bracketRegex = new RegExp(`\\[[^\\]]*?${escHText}[^\\]]*?\\]`, 'i');
+          const bMatch = pdfTextLayer.match(bracketRegex);
+          if (bMatch) {
+            targetText = bMatch[0];
+          }
+        } catch {
+          targetText = hText;
+        }
+
+        // Also clean targetText from ocrText if present
+        if (ocrText.includes(targetText)) {
+          ocrText = ocrText.replace(targetText, '').replace(/\s+/g, ' ').trim();
+        }
+
+        // Wrap targetText in pdfTextLayer with <HiddenText> tags
+        if (!pdfTextLayer.includes(`<HiddenText>${targetText}</HiddenText>`)) {
+          if (pdfTextLayer.includes(targetText)) {
+            pdfTextLayer = pdfTextLayer.replace(targetText, `<HiddenText>${targetText}</HiddenText>`);
+          } else if (pdfTextLayer.includes(hText)) {
+            pdfTextLayer = pdfTextLayer.replace(hText, `<HiddenText>${hText}</HiddenText>`);
+          } else {
+            pdfTextLayer += `\n<HiddenText>${targetText}</HiddenText>`;
+          }
         }
       }
     }
@@ -99,7 +131,7 @@ export async function getDocumentComparison(req: AuthenticatedRequest, res: Resp
     documentId: docId,
     documentName: document.fileName,
     ocrText,
-    pdfTextLayer: match?.pdfTextLayer || translate('no_data', lang),
+    pdfTextLayer,
     ocrPdfMatch: match?.matchPercent ?? 100,
     hiddenTextDetected: match?.hiddenTextDetected || false,
     textDifferenceFound: match?.textDifferenceFound || false,

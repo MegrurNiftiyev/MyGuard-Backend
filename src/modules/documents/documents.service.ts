@@ -262,7 +262,7 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       confidence: fastApiResult.confidence,
       isInjection: fastApiResult.label === 'injection',
       riskCategory: fastApiResult.label === 'injection' ? 'Prompt Injection' : 'None',
-      matchedSignatures: fastApiResult.categories || [],
+      matchedSignatures: [],
     };
   } else if (process.env.USE_MOCK_LAYER2 === 'true') {
     console.log(`[Document Service] FastAPI unavailable. Using mock Layer 2 classifier because USE_MOCK_LAYER2=true.`);

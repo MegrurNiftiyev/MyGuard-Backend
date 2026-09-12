@@ -334,8 +334,10 @@ ${doc.layer1_ocrTextMatch?.ocrText || 'Document text content.'}
           maliciousProbability = Math.round((1 - fastApiResult.confidence) * 100);
           securityVerdict = 'SAFE / CLEAN (Təhlükəsiz)';
         }
-        if (fastApiResult.categories && fastApiResult.categories.length > 0) {
-          categoriesStr = fastApiResult.categories.join(', ');
+        if (fastApiResult.label === 'injection') {
+          categoriesStr = 'Prompt Injection';
+        } else if (fastApiResult.label === 'suspicious') {
+          categoriesStr = 'Suspicious Patterns';
         }
       } else {
         // Fallback pre-scan if FastAPI microservice is offline

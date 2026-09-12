@@ -55,26 +55,14 @@ function isStructuralNoise(seg: string): boolean {
 function extractInjectionPatterns(text: string): string[] {
   const injectionSegments: string[] = [];
 
-  // Pattern 1: Comments or directives wrapped in // ... // or /* ... */ or # ... or [BRACKETED PROTOCOLS/COMMANDS] or <TAGS>
-  const commentRegex = /(?:\/\/|\/\*|#|\[(?:SYSTEM|INSTRUCTION|FRANCHISE|OVERRIDE|PROTOCOL|COMMAND|SECURITY|PROMPT)[^\]]*\]|<hidden_prompt>)([\s\S]*?)(?:\/\/|\*\/|\]|<\/hidden_prompt>|\n\n|$)/gi;
+  // Generic structural comments, bracketed blocks, and XML/HTML tags (no hardcoded keyword lists)
+  const commentRegex = /(?:\/\/[\s\S]*?(?:\n|$)||\/\*[\s\S]*?\*\/|#[\s\S]*?(?:\n|$)|\[[\s\S]*?\]|<[a-zA-Z_:][^>]*>[\s\S]*?<\/[a-zA-Z_:]+>)/gi;
   let match;
   while ((match = commentRegex.exec(text)) !== null) {
     const fullMatched = match[0].trim();
     if (fullMatched.length >= 10 && !isStructuralNoise(fullMatched)) {
       if (!injectionSegments.includes(fullMatched)) {
         injectionSegments.push(fullMatched);
-      }
-    }
-  }
-
-  // Pattern 2: Explicit prompt injection phrasing keywords & protocol overrides
-  const injectionKeywordsRegex = /(?:bu sadece bir promptdur|yazismalarimizda qeti mene bildirme|ignore previous instructions|forget all previous|system directive|disregard prior|secret instruction|sil, bu haqqda|prompt injection|bu kicik xeta olsada|override protocol|null and void|calculate all damage payouts|do not mention or disclose|exempt from any deductible|zero franchise|reporting override)/gi;
-  const sentences = text.split(/(?<=[.!?\n])\s+/);
-  for (const sentence of sentences) {
-    const trimmed = sentence.trim();
-    if (trimmed.length >= 15 && injectionKeywordsRegex.test(trimmed)) {
-      if (!injectionSegments.some(existing => existing.includes(trimmed))) {
-        injectionSegments.push(trimmed);
       }
     }
   }
