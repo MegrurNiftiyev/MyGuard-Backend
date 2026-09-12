@@ -96,12 +96,6 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
     try {
       let images: Buffer[] = [];
       try {
-        const pdf2img = await import('pdf-img-convert');
-        const converted: any = await pdf2img.default.convert(pdfBuffer, { scale: 2 });
-        images = (converted as any[]).map((img: any) => Buffer.from(img));
-        console.log(`[Layer 1] pdf-img-convert ilə ${images.length} səhifə şəkildə rendered edildi.`);
-      } catch (imgErr: any) {
-        console.warn('[Layer 1] pdf-img-convert xətası, canvas fallback istifadə edilir:', imgErr?.message);
         const { createCanvas } = await import('@napi-rs/canvas');
         for (let i = 1; i <= numPages; i++) {
           const page = await pdf.getPage(i);
@@ -111,56 +105,70 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
           await page.render({ canvasContext: ctx as any, canvas: canvas as any, viewport }).promise;
           images.push(canvas.toBuffer('image/png'));
         }
+        console.log(`[Layer 1] @napi-rs/canvas ilə ${images.length} səhifə şəkildə rendered edildi.`);
+      } catch (canvasErr: any) {
+        console.warn('[Layer 1] @napi-rs/canvas xətası, pdf-img-convert fallback yoxlanılır:', canvasErr?.message);
+        try {
+          const pdf2img = await import('pdf-img-convert');
+          const converted: any = await pdf2img.default.convert(pdfBuffer, { scale: 2 });
+          images = (converted as any[]).map((img: any) => Buffer.from(img));
+        } catch (imgErr: any) {
+          console.warn('[Layer 1] Canvas and pdf-img-convert unavailable. Using text-layer fallback:', imgErr?.message);
+        }
       }
 
-      if (env.GOOGLE_VISION_API_KEY) {
-        console.log(`[Layer 1] Google Cloud Vision API istifadə edilir (${images.length} səhifə)...`);
-        for (let i = 0; i < images.length; i++) {
-          const base64Image = images[i].toString('base64');
-          const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${env.GOOGLE_VISION_API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              requests: [
-                {
-                  image: { content: base64Image },
-                  features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
-                  imageContext: { languageHints: ['az', 'en', 'ru'] }
-                }
-              ]
-            })
-          });
+      if (images.length > 0) {
+        if (env.GOOGLE_VISION_API_KEY) {
+          console.log(`[Layer 1] Google Cloud Vision API istifadə edilir (${images.length} səhifə)...`);
+          for (let i = 0; i < images.length; i++) {
+            try {
+              const base64Image = images[i].toString('base64');
+              const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${env.GOOGLE_VISION_API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  requests: [
+                    {
+                      image: { content: base64Image },
+                      features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
+                      imageContext: { languageHints: ['az', 'en', 'ru'] }
+                    }
+                  ]
+                })
+              });
 
-          if (!response.ok) {
-            const errText = await response.text();
-            console.warn(`[Layer 1] Google Vision API Xətası: ${errText}. Tesseract-a keçilir...`);
+              if (response.ok) {
+                const data = await response.json();
+                const text = data.responses[0]?.fullTextAnnotation?.text || '';
+                fullOcrText += text + ' ';
+              } else {
+                const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng', { langPath: tessdataPath, gzip: true });
+                fullOcrText += text + ' ';
+              }
+            } catch (tessErr: any) {
+              console.warn(`[Layer 1] OCR xətası (səhifə ${i + 1}): ${tessErr?.message || tessErr}`);
+            }
+          }
+        } else {
+          console.log(`[Layer 1] GOOGLE_VISION_API_KEY tapılmadı, Tesseract (aze+eng) istifadə edilir...`);
+          for (let i = 0; i < images.length; i++) {
             try {
               const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng', { langPath: tessdataPath, gzip: true });
               fullOcrText += text + ' ';
             } catch (tessErr: any) {
               console.warn(`[Layer 1] Tesseract OCR xətası (səhifə ${i + 1}): ${tessErr?.message || tessErr}`);
             }
-          } else {
-            const data = await response.json();
-            const text = data.responses[0]?.fullTextAnnotation?.text || '';
-            fullOcrText += text + ' ';
           }
         }
-      } else {
-        console.log(`[Layer 1] GOOGLE_VISION_API_KEY tapılmadı, Tesseract (aze+eng) istifadə edilir...`);
-        for (let i = 0; i < images.length; i++) {
-          try {
-            const { data: { text } } = await Tesseract.recognize(images[i], 'aze+eng', { langPath: tessdataPath, gzip: true });
-            fullOcrText += text + ' ';
-          } catch (tessErr: any) {
-            console.warn(`[Layer 1] Tesseract OCR xətası (səhifə ${i + 1}): ${tessErr?.message || tessErr}`);
-          }
-        }
+      }
+
+      if (!fullOcrText.trim()) {
+        fullOcrText = fullPdfText;
       }
       normalizedOcrText = normalizeText(fullOcrText);
       normalizedOcrTextForCompare = normalizeForCompare(fullOcrText);
     } catch (canvasErr: any) {
-      console.warn('[Layer 1] Canvas rendering or OCR error. Using text-layer fallback:', canvasErr?.message);
+      console.warn('[Layer 1] OCR processing fallback to text-layer:', canvasErr?.message);
       fullOcrText = fullPdfText;
       normalizedOcrText = normalizedPdfText;
       normalizedOcrTextForCompare = normalizedPdfTextForCompare;
