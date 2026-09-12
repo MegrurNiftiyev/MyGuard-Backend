@@ -1,14 +1,5 @@
-// [COMMENTED OUT] Heavy native OCR dependencies - şərhə alınıb, server crash-ı aradan qaldırmaq üçün
-// Lazım olanda geri qaytarıla bilər.
-// import fs from 'fs';
-// import path from 'path';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-// import Tesseract from 'tesseract.js';
 import stringSimilarity from 'string-similarity';
-import { diffWords } from 'diff';
-import { env } from '../../config/env.js';
-
-// const tessdataPath = path.join(process.cwd(), 'tessdata');
 
 const DASH_CHARS = /[\u2010-\u2015\u2212]/g; // en-dash, em-dash, minus sign, etc.
 const CONFUSION_PAIRS: [RegExp, string][] = [
@@ -93,94 +84,9 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
     const normalizedPdfTextForCompare = normalizeForCompare(fullPdfText);
     console.log('[Layer 1] PDF text-layer çıxarıldı, uzunluq:', normalizedPdfText.length);
 
-    let fullOcrText = '';
-    let normalizedOcrText = '';
-    let normalizedOcrTextForCompare = '';
-
-    // Fast-path: If digital text-layer is already rich (>= 30 characters), use direct text layer without heavy canvas OCR
-    if (normalizedPdfText.length >= 30) {
-      console.log('[Layer 1] Rəqəmsal text-layer mövcuddur (Fast Path). OCR şəkil analizi tələb olunmur.');
-      fullOcrText = fullPdfText;
-      normalizedOcrText = normalizedPdfText;
-      normalizedOcrTextForCompare = normalizedPdfTextForCompare;
-    } else {
-      // ── [COMMENTED OUT] Heavy OCR branch ──────────────────────────────
-      // Aşağıdakı blok şərhə alınıb. Server crash-ının səbəbi bu ağır native
-      // bağımlılıqlar idi (@napi-rs/canvas, tesseract.js, Google Cloud Vision).
-      // Lazım olanda bu bloku geri qaytarmaq olar.
-      //
-      // console.log('[Layer 1] Rəqəmsal text-layer yoxdur/qısadır (Skanned PDF). Canvas & OCR analizi başladılır...');
-      // try {
-      //   const { createCanvas } = await import('@napi-rs/canvas');
-      //   const maxPagesToScan = Math.min(numPages, 5);
-      //   for (let i = 1; i <= maxPagesToScan; i++) {
-      //     try {
-      //       const page = await pdf.getPage(i);
-      //       const viewport = page.getViewport({ scale: 1.2 });
-      //       const canvas = createCanvas(viewport.width, viewport.height);
-      //       const ctx = canvas.getContext('2d');
-      //       await page.render({ canvasContext: ctx as any, canvas: canvas as any, viewport }).promise;
-      //       const imgBuf = canvas.toBuffer('image/png');
-      //       let pageText = '';
-      //       if (env.GOOGLE_VISION_API_KEY) {
-      //         try {
-      //           const base64Image = imgBuf.toString('base64');
-      //           const controller = new AbortController();
-      //           const timeoutId = setTimeout(() => controller.abort(), 10000);
-      //           const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${env.GOOGLE_VISION_API_KEY}`, {
-      //             method: 'POST',
-      //             headers: { 'Content-Type': 'application/json' },
-      //             signal: controller.signal,
-      //             body: JSON.stringify({
-      //               requests: [{ image: { content: base64Image }, features: [{ type: 'DOCUMENT_TEXT_DETECTION' }], imageContext: { languageHints: ['az', 'en', 'ru'] } }]
-      //             })
-      //           });
-      //           clearTimeout(timeoutId);
-      //           if (response.ok) {
-      //             const data = await response.json();
-      //             pageText = data.responses[0]?.fullTextAnnotation?.text || '';
-      //           }
-      //         } catch (gVisErr: any) {
-      //           console.warn(`[Layer 1] Google Vision OCR xətası (səhifə ${i}):`, gVisErr?.message);
-      //         }
-      //       }
-      //       if (!pageText) {
-      //         try {
-      //           const tessOptions: any = { gzip: true };
-      //           if (fs.existsSync(tessdataPath)) { tessOptions.langPath = tessdataPath; }
-      //           const { data: { text } } = await Tesseract.recognize(imgBuf, 'aze+eng', tessOptions);
-      //           pageText = text;
-      //         } catch (tessErr: any) {
-      //           try {
-      //             const { data: { text } } = await Tesseract.recognize(imgBuf, 'eng');
-      //             pageText = text;
-      //           } catch (retryErr: any) {
-      //             console.warn(`[Layer 1] Tesseract OCR xətası (səhifə ${i}):`, tessErr?.message || tessErr);
-      //           }
-      //         }
-      //       }
-      //       fullOcrText += pageText + ' ';
-      //     } catch (pageErr: any) {
-      //       console.warn(`[Layer 1] Səhifə ${i} render/OCR xətası:`, pageErr?.message);
-      //     }
-      //   }
-      //   if (!fullOcrText.trim()) { fullOcrText = fullPdfText; }
-      //   normalizedOcrText = normalizeText(fullOcrText);
-      //   normalizedOcrTextForCompare = normalizeForCompare(fullOcrText);
-      // } catch (canvasErr: any) {
-      //   console.warn('[Layer 1] OCR processing fallback to text-layer:', canvasErr?.message);
-      //   fullOcrText = fullPdfText;
-      //   normalizedOcrText = normalizedPdfText;
-      //   normalizedOcrTextForCompare = normalizedPdfTextForCompare;
-      // }
-      // ── [END COMMENTED OUT] ───────────────────────────────────────────
-
-      // Yüngül fallback: PDF text-layer-i birbaşa istifadə et (OCR olmadan)
-      console.log('[Layer 1] Text-layer qısadır, amma OCR deaktivdir. PDF text-layer birbaşa istifadə edilir.');
-      fullOcrText = fullPdfText;
-      normalizedOcrText = normalizedPdfText;
-      normalizedOcrTextForCompare = normalizedPdfTextForCompare;
-    }
+    const fullOcrText = fullPdfText;
+    const normalizedOcrText = normalizedPdfText;
+    const normalizedOcrTextForCompare = normalizedPdfTextForCompare;
 
     const rawPdfText = fullPdfText.replace(/\s+/g, ' ').trim();
     const rawOcrText = (fullOcrText || normalizedOcrText).replace(/\s+/g, ' ').trim();
