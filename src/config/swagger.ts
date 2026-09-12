@@ -25,6 +25,14 @@ const options: swaggerJSDoc.Options = {
         description: 'Local Development Server',
       },
     ],
+    tags: [
+      { name: 'Authentication', description: 'User login, registration, password reset & OTP management' },
+      { name: 'Users', description: 'User profile & session details' },
+      { name: 'Documents', description: 'Document upload, 3-layer security scan, comparison & sanitization' },
+      { name: 'AI Assistant', description: 'AI Assistant sessions, chat history & LLM messaging' },
+      { name: 'Admin & Registry', description: 'ML model management, version control & asynchronous training' },
+      { name: 'System', description: 'System health & operational status checks' },
+    ],
     components: {
       securitySchemes: {
         BearerAuth: {

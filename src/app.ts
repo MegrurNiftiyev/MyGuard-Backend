@@ -22,6 +22,22 @@ app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 // Swagger Interactive API Documentation UI
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   swaggerOptions: {
+    tagsSorter: (a: string, b: string) => {
+      const order = [
+        'Authentication',
+        'Users',
+        'Documents',
+        'AI Assistant',
+        'Admin & Registry',
+        'System',
+      ];
+      const idxA = order.indexOf(a);
+      const idxB = order.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    },
     operationsSorter: (a: any, b: any) => {
       const methodsOrder = ["get", "post", "patch", "put", "delete", "options", "trace"];
       let result = methodsOrder.indexOf(a.get("method")) - methodsOrder.indexOf(b.get("method"));
