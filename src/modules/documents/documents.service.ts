@@ -317,15 +317,7 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
     await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { stepStatus: 'active' }, false, lang);
 
     let layer3Result;
-    if (isConfidential) {
-      layer3Result = {
-        isMalicious: false,
-        confidence: 1,
-        aiExplanation: translate('confidential_mode_message', lang),
-        recommendedAction: 'N/A',
-        mitigationSteps: [],
-      };
-    } else if (layer1Result.isSystemError) {
+    if (layer1Result.isSystemError) {
       layer3Result = {
         isMalicious: false,
         confidence: 1,
