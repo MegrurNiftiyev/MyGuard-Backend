@@ -277,14 +277,19 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       };
     } else {
       console.log(`[Pipeline Step 2/3] FastAPI unavailable. Using local Layer 2 classifier fallback.`);
-      layer2Result = await runMockLayer2Classifier(filename, layer1Result.hiddenTextDetected);
+      const fullTextToClassify = [
+        layer1Result.pdfTextLayer,
+        ...(layer1Result.extraTextSegments || []),
+        filename
+      ].filter(Boolean).join('\n');
+      layer2Result = await runMockLayer2Classifier(fullTextToClassify, layer1Result.hiddenTextDetected);
     }
 
     await sleep(500);
     
-    const isInjection = layer2Result.isInjection;
-    const confidence = layer2Result.confidence;
-    const mlMsg = isInjection 
+    let isInjection = layer2Result.isInjection;
+    let confidence = layer2Result.confidence;
+    let mlMsg = isInjection 
       ? translate('ml_injection_detected', lang) 
       : translate('ml_safe_message', lang);
 
@@ -340,6 +345,33 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
 
     console.log(`[Pipeline Step 3/3: Layer 3 Result] IsMalicious=${layer3Result?.isMalicious} | RecAction=${layer3Result?.recommendedAction} (+${Date.now() - pipelineStartTime}ms)`);
 
+    // Sync Layer 2 classification if Layer 3 AI confirms prompt injection
+    if (layer3Result?.isMalicious && !layer2Result.isInjection) {
+      console.log(`[Pipeline Sync] Layer 3 AI confirmed malicious prompt injection attack. Syncing Layer 2 classification.`);
+      layer2Result = {
+        classification: 'High Risk',
+        confidence: layer3Result.confidence || 0.95,
+        isInjection: true,
+        riskCategory: 'Prompt Injection',
+        matchedSignatures: layer2Result.matchedSignatures.length > 0 ? layer2Result.matchedSignatures : ['ai_confirmed_prompt_injection'],
+      };
+      isInjection = true;
+      confidence = layer3Result.confidence || 0.95;
+      mlMsg = translate('ml_injection_detected', lang);
+
+      await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { 
+        stepStatus: 'completed',
+        errorDetail: null,
+        layer2_classification: {
+          label: 'injection',
+          confidence,
+          accuracy: 0.98,
+          message: mlMsg,
+          requiresUserConfirmation: true,
+        }
+      }, false, lang);
+    }
+
     await sleep(500);
     
     // Calculate Dynamic 3-Factor Weighted Composite Risk Score
@@ -356,7 +388,7 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       }
 
       let l2Score = 0;
-      if (layer2Result && fastApiResult) {
+      if (layer2Result) {
         if (layer2Result.isInjection) {
           l2Score = Math.round(layer2Result.confidence * RISK_SCORING.l2InjectionMultiplier);
         } else if (layer2Result.classification === 'Suspicious') {
