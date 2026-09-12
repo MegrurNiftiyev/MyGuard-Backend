@@ -90,38 +90,20 @@ export async function getDocumentComparison(req: AuthenticatedRequest, res: Resp
   if (hiddenTexts.length > 0) {
     for (const hText of hiddenTexts) {
       if (hText) {
+        const cleanHText = hText.trim();
+        if (!cleanHText) continue;
+
         // Strip hidden segment from ocrText if it accidentally spilled in
-        if (ocrText.includes(hText)) {
-          ocrText = ocrText.replace(hText, '').replace(/\s+/g, ' ').trim();
-        }
-        
-        // Build regex to match full multi-sentence injection block starting from hText until end of sentence
-        let targetText = hText;
-        try {
-          const escHText = hText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          // Match full sentence or multi-sentence block containing hText
-          const fullBlockRegex = new RegExp(`(?:\\b${escHText}\\b|[^\n]*?${escHText}[^\n]*?)(?:\\.[^\n]*?ver\\.|\\.[^\n]*?göstər\\.|\\.)?`, 'i');
-          const fMatch = pdfTextLayer.match(fullBlockRegex);
-          if (fMatch && fMatch[0].length >= hText.length) {
-            targetText = fMatch[0].trim();
-          }
-        } catch {
-          targetText = hText;
+        if (ocrText.includes(cleanHText)) {
+          ocrText = ocrText.replace(cleanHText, '').replace(/\s+/g, ' ').trim();
         }
 
-        // Also clean targetText from ocrText if present
-        if (ocrText.includes(targetText)) {
-          ocrText = ocrText.replace(targetText, '').replace(/\s+/g, ' ').trim();
-        }
-
-        // Wrap full targetText in pdfTextLayer cleanly with ONE <HiddenText> tag
-        if (!pdfTextLayer.includes(`<HiddenText>${targetText}</HiddenText>`)) {
-          if (pdfTextLayer.includes(targetText)) {
-            pdfTextLayer = pdfTextLayer.replace(targetText, `<HiddenText>${targetText}</HiddenText>`);
-          } else if (pdfTextLayer.includes(hText)) {
-            pdfTextLayer = pdfTextLayer.replace(hText, `<HiddenText>${hText}</HiddenText>`);
+        // Wrap each cleanHText individually in its own <HiddenText> tag
+        if (!pdfTextLayer.includes(`<HiddenText>${cleanHText}</HiddenText>`)) {
+          if (pdfTextLayer.includes(cleanHText)) {
+            pdfTextLayer = pdfTextLayer.replace(cleanHText, `<HiddenText>${cleanHText}</HiddenText>`);
           } else {
-            pdfTextLayer += `\n<HiddenText>${targetText}</HiddenText>`;
+            pdfTextLayer += `\n<HiddenText>${cleanHText}</HiddenText>`;
           }
         }
       }

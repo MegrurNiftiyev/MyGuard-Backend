@@ -245,23 +245,7 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
       finalExtraSegments = extraTextSegments;
     }
 
-    // Merge contiguous extra text segments into complete prompt injection paragraphs
-    const mergedExtraSegments: string[] = [];
-    const normalizedRawPdf = rawPdfText.replace(/\s+/g, ' ');
-    for (const seg of finalExtraSegments) {
-      if (mergedExtraSegments.length > 0) {
-        const lastIdx = mergedExtraSegments.length - 1;
-        const lastSeg = mergedExtraSegments[lastIdx];
-        const candidateCombined = `${lastSeg} ${seg}`;
-        if (normalizedRawPdf.includes(candidateCombined)) {
-          mergedExtraSegments[lastIdx] = candidateCombined;
-          continue;
-        }
-      }
-      mergedExtraSegments.push(seg);
-    }
-
-    const resultExtraSegments = mergedExtraSegments.length > 0 ? mergedExtraSegments : finalExtraSegments;
+    const resultExtraSegments = finalExtraSegments.map(s => s.trim()).filter(Boolean);
     const hiddenTextDetected = resultExtraSegments.length > 0;
 
     // Calculate final clean OCR text (strip out injection segments from OCR text representation)
