@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import Tesseract from 'tesseract.js';
@@ -142,10 +143,19 @@ export async function analyzeDocumentLayer1(pdfBuffer: Buffer) {
 
           if (!pageText) {
             try {
-              const { data: { text } } = await Tesseract.recognize(imgBuf, 'aze+eng', { langPath: tessdataPath, gzip: true });
+              const tessOptions: any = { gzip: true };
+              if (fs.existsSync(tessdataPath)) {
+                tessOptions.langPath = tessdataPath;
+              }
+              const { data: { text } } = await Tesseract.recognize(imgBuf, 'aze+eng', tessOptions);
               pageText = text;
             } catch (tessErr: any) {
-              console.warn(`[Layer 1] Tesseract OCR xətası (səhifə ${i}):`, tessErr?.message);
+              try {
+                const { data: { text } } = await Tesseract.recognize(imgBuf, 'eng');
+                pageText = text;
+              } catch (retryErr: any) {
+                console.warn(`[Layer 1] Tesseract OCR xətası (səhifə ${i}):`, tessErr?.message || tessErr);
+              }
             }
           }
 
