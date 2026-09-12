@@ -60,27 +60,12 @@ type AiMessageBlock =
 ### ✅ Konflikt 3 — İkiqat Endpoint-lərin Silinməsi (`/scan-steps` və `/pipeline`)
 - `/scan-steps` və `/pipeline` endpoint-ləri silindi. `GET /api/documents/:id` fayl haqqında bütün 3 layer məlumatını və addım tarixçəsini daşıyır.
 
-### ✅ Konflikt 4 — Security Interventions Birləşməsi
-- Ayrıca `/interventions` saxlanılmır. `GET /api/security/actions` endpoint-i `decision: 'ALLOWED' | 'BLOCKED'` parametrinə görə filtrlənir.
+### ✅ Konflikt 4 — Security Interventions Və Settings Endpoint-lərinin Ləğvi
+- Gərəksiz `/security/actions` və `/settings` endpoint-ləri ləğv edildi.
 
-### ✅ Konflikt 5 — `POST /api/admin/models` və `POST /api/admin/models/train` Bərpası
-- Model versiya registry-si üçün `POST /api/admin/models` bərpa olundu.
-- Python FastAPI ML microservice-də modeli təlimə göndərmək üçün **`POST /api/admin/models/train`** endpoint-i əlavə edildi. Backend daxili `X-Internal-Token` göndərərək təlim prosesini başladır:
-  - **Endpoint:** `POST /api/admin/models/train`
-  - **Header:** `Authorization: Bearer <Token>`
-  - **Response (200 OK):** `{ "success": true, "message": "Model təlimi uğurla başladıldı.", "job": { "job_id": "...", "status": "started" } }`
-
-### ✅ Konflikt 6 — `layer3_llmReview` Tip Genişlənməsi
-- `layer3_llmReview` obyektinə `isMalicious: boolean` və `confidence: number` sahələri əlavə edildi.
-
-### ✅ Konflikt 7 — `isContainInjection` Derived Hesablanması
-- `isContainInjection` müstəqil saxta dəyər kimi yazılmır, cavab zamanı dinamik hesablanır:
-  `isContainInjection = Boolean(finalStatus === 'high_risk' || finalStatus === 'blocked' || layer2_classification?.label === 'injection' || layer3_llmReview?.isMalicious)`
-
-### ✅ Konflikt 8 & 9 — Sanitization, Labeling və Settings Endpoint-ləri
+### ✅ Konflikt 8 & 9 — Sanitization Və Labeling Endpoint-ləri
 - `POST /api/documents/:id/clean-injection` (Təmizlənmiş sənəd renderi).
 - `PATCH /api/documents/:id/label-by-user` (İstifadəçi təsdiqi / etiketlənməsi).
-- `GET /api/settings` və `PUT /api/settings` (Platform konfiqurasiya tənzimləmələri).
 
 ### ✅ Konflikt 10 — `isConfidential` (Məxfi Rejim) Sənəd Modeli və UI Nizamlaması
 - **Backend Məntiqi:** Sənəd `isConfidential: true` parametr ilə yükləndikdə, sənəd mətnləri xarici AI LLM analizinə (Layer 3) göndərilmir, yerli OCR və ML təsnifatı aparılır.
