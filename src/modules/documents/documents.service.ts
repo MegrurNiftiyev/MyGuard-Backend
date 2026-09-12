@@ -256,34 +256,17 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       }
     }, false, lang);
 
-    // Layer 2: RETVec + CNN ML Microservice Classification
-    console.log(`[Pipeline Step 2/3: Layer 2 ML] ML classification started (+${Date.now() - pipelineStartTime}ms)...`);
+    // Layer 2: Direct LLM Security Classification
+    console.log(`[Pipeline Step 2/3: Layer 2 LLM] Direct LLM security classification started (+${Date.now() - pipelineStartTime}ms)...`);
     await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { stepStatus: 'active' }, false, lang);
 
-    const fastApiResult = await classifyDocumentText({
-      documentId: docId,
-      fullText: layer1Result.pdfTextLayer || filename,
-    });
+    const fullTextToClassify = [
+      layer1Result.pdfTextLayer,
+      ...(layer1Result.extraTextSegments || []),
+      filename
+    ].filter(Boolean).join('\n');
 
-    let layer2Result: Layer2ClassifierResult;
-    
-    if (fastApiResult) {
-      layer2Result = {
-        classification: fastApiResult.label === 'injection' ? 'High Risk' : fastApiResult.label === 'suspicious' ? 'Suspicious' : 'Safe',
-        confidence: fastApiResult.confidence,
-        isInjection: fastApiResult.label === 'injection',
-        riskCategory: fastApiResult.label === 'injection' ? 'Prompt Injection' : 'None',
-        matchedSignatures: [],
-      };
-    } else {
-      console.log(`[Pipeline Step 2/3] FastAPI unavailable. Using local Layer 2 classifier fallback.`);
-      const fullTextToClassify = [
-        layer1Result.pdfTextLayer,
-        ...(layer1Result.extraTextSegments || []),
-        filename
-      ].filter(Boolean).join('\n');
-      layer2Result = await runMockLayer2Classifier(fullTextToClassify, layer1Result.hiddenTextDetected);
-    }
+    let layer2Result: Layer2ClassifierResult = await runMockLayer2Classifier(fullTextToClassify, layer1Result.hiddenTextDetected);
 
     await sleep(500);
     
@@ -414,8 +397,6 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
 
       if (isConfidential) {
         overallRiskScore = Math.round(l1Score * RISK_SCORING.weightsConfidential.l1 + l2Score * RISK_SCORING.weightsConfidential.l2);
-      } else if (!fastApiResult) {
-        overallRiskScore = Math.round(l1Score * RISK_SCORING.weightsL2Offline.l1 + l3Score * RISK_SCORING.weightsL2Offline.l3);
       } else {
         overallRiskScore = Math.round(
           l1Score * RISK_SCORING.weightsStandard.l1 + 
