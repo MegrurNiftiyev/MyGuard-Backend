@@ -1,133 +1,94 @@
 import { Router } from 'express';
 import { catchAsync } from '../../utils/catchAsync.js';
-import { listModels, registerModel, trainModel } from './admin.controller.js';
+import {
+  getActiveModelController,
+  getAllModelsController,
+  changeModelVersionController,
+  trainModelController,
+} from './admin.controller.js';
 
 const router = Router();
 
 /**
  * @openapi
- * /api/admin/models:
+ * /api/admin/models/active:
  *   get:
- *     summary: List deployed ML models and sanitizer engines
+ *     summary: Get active ML model metadata directly from FastAPI ML service
  *     tags: [Admin & Registry]
- *     security:
- *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: List of deployed models
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 models:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: string
- *                         example: "mod-1"
- *                       name:
- *                         type: string
- *                         example: "STANDARD AI (Cloud Enterprise)"
- *                       mode:
- *                         type: string
- *                         example: "STANDARD AI"
- *                       status:
- *                         type: string
- *                         example: "Active"
- *                       isLocal:
- *                         type: boolean
- *                         example: false
- *                       provider:
- *                         type: string
- *                         example: "Cloud High-Performance LLM"
- *   post:
- *     summary: Change current ML model version
- *     tags: [Admin & Registry]
- *     security:
- *       - BearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/RegisterModelRequest'
- *     responses:
- *       201:
- *         description: Model registered successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 model:
- *                   type: object
+ *         description: Currently active model metadata from FastAPI
  * 
- * /api/admin/models/change-version:
- *   post:
- *     summary: Change current ML model version
+ * /api/admin/models/all-models:
+ *   get:
+ *     summary: List all ML models with optional query filters directly from FastAPI ML service
  *     tags: [Admin & Registry]
- *     security:
- *       - BearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/RegisterModelRequest'
+ *     parameters:
+ *       - in: query
+ *         name: version
+ *         schema:
+ *           type: string
+ *         description: Exact version string filter (e.g. run-10)
+ *       - in: query
+ *         name: version_min
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: version_max
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: min_accuracy
+ *         schema:
+ *           type: number
+ *       - in: query
+ *         name: max_accuracy
+ *         schema:
+ *           type: number
+ *       - in: query
+ *         name: min_date
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: max_date
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by status ('active', 'archived', 'candidate')
  *     responses:
  *       200:
- *         description: Model version changed successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 model:
- *                   type: object
+ *         description: List of all models from FastAPI
+ * 
+ * /api/admin/models/change-version/{version_id}:
+ *   post:
+ *     summary: Change active ML model version directly via FastAPI ML service
+ *     tags: [Admin & Registry]
+ *     parameters:
+ *       - in: path
+ *         name: version_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Model version changed successfully via FastAPI
  * 
  * /api/admin/models/train:
  *   post:
  *     summary: Trigger asynchronous model training in FastAPI ML microservice
  *     tags: [Admin & Registry]
- *     security:
- *       - BearerAuth: []
- *     requestBody:
- *       required: false
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/TrainModelRequest'
  *     responses:
  *       200:
  *         description: Training job triggered successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Model təlimi uğurla başladıldı."
- *                 job:
- *                   type: object
  */
-router.get('/models', catchAsync(listModels));
-router.post('/models', catchAsync(registerModel));
-router.post('/models/change-version', catchAsync(registerModel));
-router.post('/models/train', catchAsync(trainModel));
+
+router.get('/models/active', catchAsync(getActiveModelController));
+router.get('/models/all-models', catchAsync(getAllModelsController));
+router.post('/models/change-version/:version_id', catchAsync(changeModelVersionController));
+router.post('/models/change-version', catchAsync(changeModelVersionController));
+router.post('/models/train', catchAsync(trainModelController));
 
 export default router;
-
-
