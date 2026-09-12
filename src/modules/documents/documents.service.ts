@@ -170,271 +170,266 @@ export async function processAndSaveDocument(
 }
 
 async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, mimeType: string, lang: SupportedLanguage = 'az', isConfidential: boolean = false) {
-  // Wait a bit to ensure UI can connect to socket
-  await sleep(1000); 
+  try {
+    // Wait a bit to ensure UI can connect to socket
+    await sleep(1000); 
 
-  await updateDocumentAndEmit(docId, 'DOCUMENT_UPLOADED', { 
-    scanStartedAt: new Date().toISOString(), 
-    stepStatus: 'active' 
-  }, false, lang);
-  await sleep(800);
-  await updateDocumentAndEmit(docId, 'DOCUMENT_UPLOADED', { stepStatus: 'completed' }, false, lang);
+    await updateDocumentAndEmit(docId, 'DOCUMENT_UPLOADED', { 
+      scanStartedAt: new Date().toISOString(), 
+      stepStatus: 'active' 
+    }, false, lang);
+    await sleep(800);
+    await updateDocumentAndEmit(docId, 'DOCUMENT_UPLOADED', { stepStatus: 'completed' }, false, lang);
 
-  // Layer 1
-  await updateDocumentAndEmit(docId, 'PDF_TEXT_EXTRACTION', { stepStatus: 'active' }, false, lang);
-  await sleep(800);
-  await updateDocumentAndEmit(docId, 'PDF_TEXT_EXTRACTION', { stepStatus: 'completed' }, false, lang);
+    // Layer 1
+    await updateDocumentAndEmit(docId, 'PDF_TEXT_EXTRACTION', { stepStatus: 'active' }, false, lang);
+    await sleep(800);
+    await updateDocumentAndEmit(docId, 'PDF_TEXT_EXTRACTION', { stepStatus: 'completed' }, false, lang);
 
-  await updateDocumentAndEmit(docId, 'OCR_ANALYSIS', { stepStatus: 'active' }, false, lang);
-  let layer1Result: any = { matchPercent: 98, hiddenTextDetected: false };
-  const lowerName = filename.toLowerCase();
-  
-  if (mimeType.includes('pdf') || lowerName.endsWith('.pdf')) {
-    layer1Result = await analyzeDocumentLayer1(fileBuffer);
-  } else if (
-    mimeType.includes('wordprocessingml') || 
-    mimeType.includes('presentationml') ||
-    mimeType.includes('spreadsheetml') ||
-    lowerName.endsWith('.docx') || 
-    lowerName.endsWith('.pptx') || 
-    lowerName.endsWith('.xlsx')
-  ) {
-    try {
-      console.log(`[Layer 1] LibreOffice vasitəsilə ${filename} PDF formatına çevrilir...`);
-      const libre = await import('libreoffice-convert');
-      const { promisify } = await import('util');
-      const convertAsync = promisify(libre.convert);
-      
-      const pdfBuf = await convertAsync(fileBuffer, '.pdf', undefined);
-      console.log(`[Layer 1] Çevrilmə uğurludur, PDF OCR analizinə ötürülür...`);
-      layer1Result = await analyzeDocumentLayer1(pdfBuf);
-    } catch (err: any) {
-      console.warn(`[Layer 1] Office -> PDF çevrilmə xətası: ${err.message}`);
-      layer1Result = { 
-        matchPercent: 0, 
-        hiddenTextDetected: false, 
-        extraTextSegments: [],
-        ocrText: 'XƏTA: Sənəd oxuna bilmədi', 
-        pdfTextLayer: 'XƏTA: Sənəd oxuna bilmədi',
-        isSystemError: true
+    await updateDocumentAndEmit(docId, 'OCR_ANALYSIS', { stepStatus: 'active' }, false, lang);
+    let layer1Result: any = { matchPercent: 98, hiddenTextDetected: false };
+    const lowerName = filename.toLowerCase();
+    
+    if (mimeType.includes('pdf') || lowerName.endsWith('.pdf')) {
+      layer1Result = await analyzeDocumentLayer1(fileBuffer);
+    } else if (
+      mimeType.includes('wordprocessingml') || 
+      mimeType.includes('presentationml') ||
+      mimeType.includes('spreadsheetml') ||
+      lowerName.endsWith('.docx') || 
+      lowerName.endsWith('.pptx') || 
+      lowerName.endsWith('.xlsx')
+    ) {
+      try {
+        console.log(`[Layer 1] LibreOffice vasitəsilə ${filename} PDF formatına çevrilir...`);
+        const libre = await import('libreoffice-convert');
+        const { promisify } = await import('util');
+        const convertAsync = promisify(libre.convert);
+        
+        const pdfBuf = await convertAsync(fileBuffer, '.pdf', undefined);
+        console.log(`[Layer 1] Çevrilmə uğurludur, PDF OCR analizinə ötürülür...`);
+        layer1Result = await analyzeDocumentLayer1(pdfBuf);
+      } catch (err: any) {
+        console.warn(`[Layer 1] Office -> PDF çevrilmə xətası: ${err.message}`);
+        layer1Result = { 
+          matchPercent: 0, 
+          hiddenTextDetected: false, 
+          extraTextSegments: [],
+          ocrText: 'XƏTA: Sənəd oxuna bilmədi', 
+          pdfTextLayer: 'XƏTA: Sənəd oxuna bilmədi',
+          isSystemError: true
+        };
+      }
+    } else {
+      await sleep(1500); // Simulate OCR for unsupported
+    }
+    await updateDocumentAndEmit(docId, 'OCR_ANALYSIS', { stepStatus: 'completed' }, false, lang);
+
+    await updateDocumentAndEmit(docId, 'TEXT_COMPARISON', { stepStatus: 'active' }, false, lang);
+    await sleep(800);
+    await updateDocumentAndEmit(docId, 'TEXT_COMPARISON', { stepStatus: 'completed' }, false, lang);
+
+    const hasExtraText = layer1Result.extraTextSegments && layer1Result.extraTextSegments.length > 0;
+    const matchPercent = layer1Result.matchPercent || 95;
+    const isSuspiciousMatch = layer1Result.hiddenTextDetected || matchPercent < 90;
+    const hiddenTexts = layer1Result.extraTextSegments || [];
+
+    await updateDocumentAndEmit(docId, 'HIDDEN_TEXT_DETECTION', { 
+      stepStatus: 'completed',
+      layer1_ocrTextMatch: {
+        matchPercent,
+        hiddenTextDetected: layer1Result.hiddenTextDetected,
+        hiddenTexts,
+        textDifferenceFound: hasExtraText || isSuspiciousMatch,
+        ocrText: layer1Result.ocrText || `OCR: ${filename}`,
+        pdfTextLayer: layer1Result.pdfTextLayer || `PDF text: ${filename}`,
+        status: isSuspiciousMatch ? 'suspicious' : 'clean'
+      }
+    }, false, lang);
+
+    // Layer 2: RETVec + CNN ML Microservice Classification
+    await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { stepStatus: 'active' }, false, lang);
+
+    const fastApiResult = await classifyDocumentText({
+      documentId: docId,
+      fullText: layer1Result.pdfTextLayer || filename,
+    });
+
+    let layer2Result: Layer2ClassifierResult | null = null;
+    
+    if (fastApiResult) {
+      layer2Result = {
+        classification: fastApiResult.label === 'injection' ? 'High Risk' : fastApiResult.label === 'suspicious' ? 'Suspicious' : 'Safe',
+        confidence: fastApiResult.confidence,
+        isInjection: fastApiResult.label === 'injection',
+        riskCategory: fastApiResult.label === 'injection' ? 'Prompt Injection' : 'None',
+        matchedSignatures: [],
+      };
+    } else if (process.env.USE_MOCK_LAYER2 === 'true') {
+      console.log(`[Document Service] FastAPI unavailable. Using mock Layer 2 classifier because USE_MOCK_LAYER2=true.`);
+      layer2Result = await runMockLayer2Classifier(filename, layer1Result.hiddenTextDetected);
+    } else {
+      console.error(`[Document Service] FastAPI Layer 2 classification failed and mock is disabled.`);
+    }
+
+    await sleep(1000);
+    
+    const isInjection = layer2Result?.isInjection || false;
+    const confidence = layer2Result?.confidence || 0;
+    const mlMsg = !layer2Result 
+      ? translate('ml_unavailable_message', lang) || 'Analiz natamamdır (ML servisi əlçatmazdır)'
+      : isInjection 
+        ? translate('ml_injection_detected', lang) 
+        : translate('ml_safe_message', lang);
+
+    await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { 
+      stepStatus: !layer2Result ? 'error' : 'completed',
+      errorDetail: !layer2Result ? 'FastAPI classifier unavailable' : null,
+      layer2_classification: !layer2Result ? null : {
+        label: isInjection ? 'injection' : 'safe',
+        confidence,
+        accuracy: 0.98,
+        message: mlMsg,
+        requiresUserConfirmation: isInjection || layer1Result.hiddenTextDetected,
+      }
+    }, false, lang);
+
+    if (!layer2Result) {
+      layer2Result = {
+        classification: 'Safe',
+        confidence: 0,
+        isInjection: false,
+        riskCategory: 'None',
+        matchedSignatures: [],
       };
     }
-  } else {
-    await sleep(1500); // Simulate OCR for unsupported
-  }
-  await updateDocumentAndEmit(docId, 'OCR_ANALYSIS', { stepStatus: 'completed' }, false, lang);
 
-  await updateDocumentAndEmit(docId, 'TEXT_COMPARISON', { stepStatus: 'active' }, false, lang);
-  await sleep(800);
-  await updateDocumentAndEmit(docId, 'TEXT_COMPARISON', { stepStatus: 'completed' }, false, lang);
+    // Layer 3: Risk Assessment & LLM Security Evaluation
+    await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { stepStatus: 'active' }, false, lang);
 
-  const hasExtraText = layer1Result.extraTextSegments && layer1Result.extraTextSegments.length > 0;
-  const matchPercent = layer1Result.matchPercent || 95;
-  const isSuspiciousMatch = layer1Result.hiddenTextDetected || matchPercent < 90;
-  const hiddenTexts = layer1Result.extraTextSegments || [];
-
-  await updateDocumentAndEmit(docId, 'HIDDEN_TEXT_DETECTION', { 
-    stepStatus: 'completed',
-    layer1_ocrTextMatch: {
-      matchPercent,
-      hiddenTextDetected: layer1Result.hiddenTextDetected,
-      hiddenTexts,
-      textDifferenceFound: hasExtraText || isSuspiciousMatch,
-      ocrText: layer1Result.ocrText || `OCR: ${filename}`,
-      pdfTextLayer: layer1Result.pdfTextLayer || `PDF text: ${filename}`,
-      status: isSuspiciousMatch ? 'suspicious' : 'clean'
-    }
-  }, false, lang);
-
-  // Layer 2: RETVec + CNN ML Microservice Classification
-  await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { stepStatus: 'active' }, false, lang);
-
-  const fastApiResult = await classifyDocumentText({
-    documentId: docId,
-    fullText: layer1Result.pdfTextLayer || filename,
-  });
-
-  let layer2Result: Layer2ClassifierResult | null = null;
-  
-  if (fastApiResult) {
-    layer2Result = {
-      classification: fastApiResult.label === 'injection' ? 'High Risk' : fastApiResult.label === 'suspicious' ? 'Suspicious' : 'Safe',
-      confidence: fastApiResult.confidence,
-      isInjection: fastApiResult.label === 'injection',
-      riskCategory: fastApiResult.label === 'injection' ? 'Prompt Injection' : 'None',
-      matchedSignatures: [],
-    };
-  } else if (process.env.USE_MOCK_LAYER2 === 'true') {
-    console.log(`[Document Service] FastAPI unavailable. Using mock Layer 2 classifier because USE_MOCK_LAYER2=true.`);
-    layer2Result = await runMockLayer2Classifier(filename, layer1Result.hiddenTextDetected);
-  } else {
-    console.error(`[Document Service] FastAPI Layer 2 classification failed and mock is disabled.`);
-  }
-
-  await sleep(1000);
-  
-  const isInjection = layer2Result?.isInjection || false;
-  const confidence = layer2Result?.confidence || 0;
-  const mlMsg = !layer2Result 
-    ? translate('ml_unavailable_message', lang) || 'Analiz natamamdır (ML servisi əlçatmazdır)'
-    : isInjection 
-      ? translate('ml_injection_detected', lang) 
-      : translate('ml_safe_message', lang);
-
-  await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { 
-    stepStatus: !layer2Result ? 'error' : 'completed',
-    errorDetail: !layer2Result ? 'FastAPI classifier unavailable' : null,
-    layer2_classification: !layer2Result ? null : {
-      label: isInjection ? 'injection' : 'safe',
-      confidence,
-      accuracy: 0.98,
-      message: mlMsg,
-      requiresUserConfirmation: isInjection || layer1Result.hiddenTextDetected,
-    }
-  }, false, lang);
-
-  if (!layer2Result) {
-    // We shouldn't stop the pipeline completely, but Layer 3 might need a layer2Result.
-    // Let's pass a dummy layer2Result to layer 3 so it doesn't crash, but keep the document status error.
-    layer2Result = {
-      classification: 'Safe',
-      confidence: 0,
-      isInjection: false,
-      riskCategory: 'None',
-      matchedSignatures: [],
-    };
-  }
-
-  // Layer 3: Risk Assessment & LLM Security Evaluation
-  await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { stepStatus: 'active' }, false, lang);
-
-  let layer3Result;
-  if (isConfidential) {
-    layer3Result = {
-      isMalicious: false,
-      confidence: 1,
-      aiExplanation: translate('confidential_mode_message', lang),
-      recommendedAction: 'N/A',
-      mitigationSteps: [],
-    };
-  } else if (layer1Result.isSystemError) {
-    layer3Result = {
-      isMalicious: false,
-      confidence: 1,
-      aiExplanation: translate('err_conversion', lang),
-      recommendedAction: translate('err_conversion_rec', lang),
-      mitigationSteps: [],
-    };
-  } else {
-    layer3Result = await evaluateLayer3SecurityLLM({
-      filename,
-      ocrText: layer1Result.ocrText,
-      pdfTextLayer: layer1Result.pdfTextLayer,
-      extraTextSegments: layer1Result.extraTextSegments,
-      matchPercent: layer1Result.matchPercent || 95,
-      hiddenTextDetected: layer1Result.hiddenTextDetected || false,
-      layer2Result,
-      lang,
-    });
-  }
-
-  await sleep(1000);
-  
-  // Calculate Dynamic 3-Factor Weighted Composite Risk Score
-  let overallRiskScore = 0;
-
-  if (layer1Result.isSystemError) {
-    overallRiskScore = 0;
-  } else {
-    // Factor 1: Layer 1 OCR vs PDF Text Discrepancy & Hidden Text Score (0-100)
-    const matchPct = layer1Result.matchPercent ?? 100;
-    let l1Score = 100 - matchPct; // Mismatch percent
-    if (layer1Result.hiddenTextDetected) {
-      const extraCount = layer1Result.extraTextSegments?.length || 1;
-      l1Score = Math.max(l1Score, RISK_SCORING.hiddenTextFloorBase + Math.min(extraCount * RISK_SCORING.hiddenTextFloorPerSegment, RISK_SCORING.hiddenTextFloorCap));
-    }
-
-    // Factor 2: Layer 2 RETVec + CNN ML Classifier Score (0-100)
-    let l2Score = 0;
-    if (layer2Result && fastApiResult) {
-      if (layer2Result.isInjection) {
-        l2Score = Math.round(layer2Result.confidence * RISK_SCORING.l2InjectionMultiplier);
-      } else if (layer2Result.classification === 'Suspicious') {
-        l2Score = Math.round(layer2Result.confidence * RISK_SCORING.l2SuspiciousMultiplier);
-      } else {
-        l2Score = Math.round((1 - layer2Result.confidence) * RISK_SCORING.l2SafeResidualCap);
-      }
-    } else {
-      // Fallback if FastAPI ML microservice was offline
-      l2Score = l1Score;
-    }
-
-    // Factor 3: Layer 3 Contextual LLM Security Review Score (0-100)
-    let l3Score = 0;
+    let layer3Result;
     if (isConfidential) {
-      l3Score = 0; // Layer 3 bypassed for confidential docs
-    } else if (layer3Result) {
-      if (!layer3Result.confidence) {
-        console.warn(`[Document Service] Layer 3 confidence missing for ${filename}, defaulting to neutral baseline ${RISK_SCORING.l3DefaultConfidence}`);
-      }
-      const l3Conf = layer3Result.confidence || RISK_SCORING.l3DefaultConfidence;
-      if (layer3Result.isMalicious) {
-        l3Score = Math.round(l3Conf * RISK_SCORING.l3MaliciousMultiplier);
-      } else {
-        l3Score = Math.round((1 - l3Conf) * RISK_SCORING.l3SafeResidualCap);
-      }
-    }
-
-    // Combine 3 Factors with Weights
-    if (isConfidential) {
-      overallRiskScore = Math.round(l1Score * RISK_SCORING.weightsConfidential.l1 + l2Score * RISK_SCORING.weightsConfidential.l2);
-    } else if (!fastApiResult) {
-      // If Layer 2 was offline
-      overallRiskScore = Math.round(l1Score * RISK_SCORING.weightsL2Offline.l1 + l3Score * RISK_SCORING.weightsL2Offline.l3);
+      layer3Result = {
+        isMalicious: false,
+        confidence: 1,
+        aiExplanation: translate('confidential_mode_message', lang),
+        recommendedAction: 'N/A',
+        mitigationSteps: [],
+      };
+    } else if (layer1Result.isSystemError) {
+      layer3Result = {
+        isMalicious: false,
+        confidence: 1,
+        aiExplanation: translate('err_conversion', lang),
+        recommendedAction: translate('err_conversion_rec', lang),
+        mitigationSteps: [],
+      };
     } else {
-      // All 3 Layers Active
-      overallRiskScore = Math.round(
-        l1Score * RISK_SCORING.weightsStandard.l1 + 
-        l2Score * RISK_SCORING.weightsStandard.l2 + 
-        l3Score * RISK_SCORING.weightsStandard.l3
-      );
+      layer3Result = await evaluateLayer3SecurityLLM({
+        filename,
+        ocrText: layer1Result.ocrText,
+        pdfTextLayer: layer1Result.pdfTextLayer,
+        extraTextSegments: layer1Result.extraTextSegments,
+        matchPercent: layer1Result.matchPercent || 95,
+        hiddenTextDetected: layer1Result.hiddenTextDetected || false,
+        layer2Result,
+        lang,
+      });
     }
 
-    // Absolute Threat Override Floor:
-    // If any layer strongly identifies an active prompt injection threat, ensure high risk score (at least threatFloorScore)
+    await sleep(1000);
+    
+    // Calculate Dynamic 3-Factor Weighted Composite Risk Score
+    let overallRiskScore = 0;
+
+    if (layer1Result.isSystemError) {
+      overallRiskScore = 0;
+    } else {
+      const matchPct = layer1Result.matchPercent ?? 100;
+      let l1Score = 100 - matchPct;
+      if (layer1Result.hiddenTextDetected) {
+        const extraCount = layer1Result.extraTextSegments?.length || 1;
+        l1Score = Math.max(l1Score, RISK_SCORING.hiddenTextFloorBase + Math.min(extraCount * RISK_SCORING.hiddenTextFloorPerSegment, RISK_SCORING.hiddenTextFloorCap));
+      }
+
+      let l2Score = 0;
+      if (layer2Result && fastApiResult) {
+        if (layer2Result.isInjection) {
+          l2Score = Math.round(layer2Result.confidence * RISK_SCORING.l2InjectionMultiplier);
+        } else if (layer2Result.classification === 'Suspicious') {
+          l2Score = Math.round(layer2Result.confidence * RISK_SCORING.l2SuspiciousMultiplier);
+        } else {
+          l2Score = Math.round((1 - layer2Result.confidence) * RISK_SCORING.l2SafeResidualCap);
+        }
+      } else {
+        l2Score = l1Score;
+      }
+
+      let l3Score = 0;
+      if (isConfidential) {
+        l3Score = 0;
+      } else if (layer3Result) {
+        const l3Conf = layer3Result.confidence || RISK_SCORING.l3DefaultConfidence;
+        if (layer3Result.isMalicious) {
+          l3Score = Math.round(l3Conf * RISK_SCORING.l3MaliciousMultiplier);
+        } else {
+          l3Score = Math.round((1 - l3Conf) * RISK_SCORING.l3SafeResidualCap);
+        }
+      }
+
+      if (isConfidential) {
+        overallRiskScore = Math.round(l1Score * RISK_SCORING.weightsConfidential.l1 + l2Score * RISK_SCORING.weightsConfidential.l2);
+      } else if (!fastApiResult) {
+        overallRiskScore = Math.round(l1Score * RISK_SCORING.weightsL2Offline.l1 + l3Score * RISK_SCORING.weightsL2Offline.l3);
+      } else {
+        overallRiskScore = Math.round(
+          l1Score * RISK_SCORING.weightsStandard.l1 + 
+          l2Score * RISK_SCORING.weightsStandard.l2 + 
+          l3Score * RISK_SCORING.weightsStandard.l3
+        );
+      }
+
+      const isLlmBlockRecommended = Boolean(layer3Result?.recommendedAction?.toUpperCase().includes('BLOCK'));
+      if (layer3Result?.isMalicious || isInjection || isLlmBlockRecommended || (layer1Result.hiddenTextDetected && matchPct < RISK_SCORING.threatFloorMatchPctCutoff)) {
+        overallRiskScore = Math.max(overallRiskScore, RISK_SCORING.threatFloorScore);
+      }
+
+      overallRiskScore = Math.min(100, Math.max(0, overallRiskScore));
+    }
+
     const isLlmBlockRecommended = Boolean(layer3Result?.recommendedAction?.toUpperCase().includes('BLOCK'));
-    if (layer3Result?.isMalicious || isInjection || isLlmBlockRecommended || (layer1Result.hiddenTextDetected && matchPct < RISK_SCORING.threatFloorMatchPctCutoff)) {
-      overallRiskScore = Math.max(overallRiskScore, RISK_SCORING.threatFloorScore);
-    }
+    const status: RiskStatus = layer1Result.isSystemError 
+      ? 'safe' 
+      : isLlmBlockRecommended
+        ? 'blocked'
+        : (overallRiskScore >= RISK_SCORING.statusHighRiskCutoff 
+          ? 'high_risk' 
+          : overallRiskScore >= RISK_SCORING.statusSuspiciousCutoff 
+            ? 'suspicious' 
+            : 'safe');
 
-    // Bound score between 0 and 100
-    overallRiskScore = Math.min(100, Math.max(0, overallRiskScore));
+    await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { 
+      stepStatus: 'completed',
+      layer3_llmReview: {
+        used: overallRiskScore > RISK_SCORING.llmReviewUsedCutoff || layer3Result?.isMalicious || false,
+        isMalicious: layer3Result?.isMalicious || false,
+        confidence: layer3Result?.confidence || RISK_SCORING.l3DefaultConfidence,
+        aiExplanation: layer3Result?.aiExplanation || '',
+        recommendedAction: layer3Result?.recommendedAction || '',
+        mitigationSteps: layer3Result?.mitigationSteps || [],
+      },
+      finalRiskScore: overallRiskScore,
+      finalStatus: status
+    }, true, lang);
+  } catch (pipelineErr: any) {
+    console.error(`[Document Pipeline Error] ${docId} skan xətası:`, pipelineErr);
+    await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', {
+      stepStatus: 'error',
+      errorDetail: pipelineErr?.message || 'Uncaught pipeline error',
+      finalStatus: 'safe',
+      finalRiskScore: 0,
+    }, true, lang);
   }
-
-  const isLlmBlockRecommended = Boolean(layer3Result?.recommendedAction?.toUpperCase().includes('BLOCK'));
-  const status: RiskStatus = layer1Result.isSystemError 
-    ? 'safe' 
-    : isLlmBlockRecommended
-      ? 'blocked'
-      : (overallRiskScore >= RISK_SCORING.statusHighRiskCutoff 
-        ? 'high_risk' 
-        : overallRiskScore >= RISK_SCORING.statusSuspiciousCutoff 
-          ? 'suspicious' 
-          : 'safe');
-
-  await updateDocumentAndEmit(docId, 'RISK_ASSESSMENT', { 
-    stepStatus: 'completed',
-    layer3_llmReview: {
-      used: overallRiskScore > RISK_SCORING.llmReviewUsedCutoff || layer3Result?.isMalicious || false,
-      isMalicious: layer3Result?.isMalicious || false,
-      confidence: layer3Result?.confidence || RISK_SCORING.l3DefaultConfidence,
-      aiExplanation: layer3Result?.aiExplanation || '',
-      recommendedAction: layer3Result?.recommendedAction || '',
-      mitigationSteps: layer3Result?.mitigationSteps || [],
-    },
-    finalRiskScore: overallRiskScore,
-    finalStatus: status
-  }, true, lang); // isFinal = true
 }
 
 export async function getUserDocuments(userId: string): Promise<DocumentListItem[]> {
