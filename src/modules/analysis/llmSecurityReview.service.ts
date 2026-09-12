@@ -141,7 +141,7 @@ export async function evaluateLayer3SecurityLLM(
     try {
       console.log(`[LLM Security] Calling OpenAI (${env.OPENAI_MODEL}) for doc: ${params.filename}`);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',

@@ -82,7 +82,8 @@ export async function classifyDocumentText(
   const url = `${baseUrl}/analyze-injection`;
 
   const docId = payload.documentId || 'N/A';
-  console.log(`[FastAPI Service] Sending classification request for doc: ${docId}`);
+  const startTime = Date.now();
+  console.log(`[FastAPI Service] Sending classification request for doc: ${docId} to ${url}`);
 
   // Build body with strictly allowed fields only (Pydantic extra: forbid)
   const body: Record<string, any> = {
@@ -94,7 +95,7 @@ export async function classifyDocumentText(
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout (Render cold start can take 20s)
 
     const response = await fetch(url, {
       method: 'POST',
@@ -138,13 +139,18 @@ export async function classifyDocumentText(
     }
 
     const data = (await response.json()) as ClassifyResponseData;
-    console.log(`[FastAPI Service] Classification result for ${docId}: label=${data.label}, confidence=${data.confidence}`);
+    console.log(`[FastAPI Service] Classification result for ${docId}: label=${data.label}, confidence=${data.confidence} (${Date.now() - startTime}ms)`);
     return {
       label: data.label,
       confidence: data.confidence,
     };
   } catch (err: any) {
-    console.error(`[FastAPI Service] Connection failed to ${url}: ${err?.message || err}`);
+    const elapsed = Date.now() - startTime;
+    if (err?.name === 'AbortError') {
+      console.error(`[FastAPI Service] TIMEOUT after ${elapsed}ms for doc ${docId}. FastAPI may be cold-starting on Render.`);
+    } else {
+      console.error(`[FastAPI Service] Connection failed to ${url} after ${elapsed}ms: ${err?.message || err}`);
+    }
     return null;
   }
 }

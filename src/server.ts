@@ -58,3 +58,23 @@ httpServer.listen(PORT, async () => {
     }
   }
 });
+
+// ── Graceful Shutdown (Render SIGTERM handler) ──────────────────────────
+// Render sends SIGTERM during zero-downtime deploys. Without this handler,
+// Node's npm wrapper treats it as a crash and prints scary "npm error signal SIGTERM".
+// This handler lets in-flight requests finish (up to 10s) then exits cleanly.
+function gracefulShutdown(signal: string) {
+  console.log(`\n⚠️  [Server] Received ${signal}. Shutting down gracefully...`);
+  httpServer.close(() => {
+    console.log(`[Server] HTTP server closed. Exiting with code 0.`);
+    process.exit(0);
+  });
+  // Force exit after 10s if connections don't close
+  setTimeout(() => {
+    console.warn(`[Server] Forcing shutdown after 10s timeout.`);
+    process.exit(0);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
