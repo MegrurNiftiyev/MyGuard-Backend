@@ -208,22 +208,22 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       lowerName.endsWith('.xlsx')
     ) {
       try {
-        console.log(`[Layer 1] LibreOffice vasitəsilə ${filename} PDF formatına çevrilir...`);
+        console.log(`[Layer 1] Converting ${filename} to PDF format via LibreOffice...`);
         const libre = await import('libreoffice-convert');
         const { promisify } = await import('util');
         const convertAsync = promisify(libre.convert);
         
         const pdfBuf = await convertAsync(fileBuffer, '.pdf', undefined);
-        console.log(`[Layer 1] Çevrilmə uğurludur (${(pdfBuf.length / 1024).toFixed(1)} KB PDF), OCR analizinə ötürülür...`);
+        console.log(`[Layer 1] Conversion successful (${(pdfBuf.length / 1024).toFixed(1)} KB PDF), proceeding to OCR analysis...`);
         layer1Result = await analyzeDocumentLayer1(pdfBuf);
       } catch (err: any) {
-        console.warn(`[Layer 1] Office -> PDF çevrilmə xətası: ${err.message}`);
+        console.warn(`[Layer 1] Office to PDF conversion error: ${err.message}`);
         layer1Result = { 
           matchPercent: 0, 
           hiddenTextDetected: false, 
           extraTextSegments: [],
-          ocrText: 'XƏTA: Sənəd oxuna bilmədi', 
-          pdfTextLayer: 'XƏTA: Sənəd oxuna bilmədi',
+          ocrText: 'ERROR: Document could not be parsed', 
+          pdfTextLayer: 'ERROR: Document could not be parsed',
           isSystemError: true
         };
       }
@@ -695,7 +695,7 @@ export async function deleteDocumentRecord(docId: string): Promise<boolean> {
 export async function updateDocumentLabel(docId: string, isContainInjection: boolean): Promise<Document> {
   const doc = await getDocumentById(docId);
   if (!doc) {
-    throw new AppError('Sənəd tapılmadı', 404);
+    throw new AppError('Document not found', 404);
   }
   
   doc.reviewedByUser = true;

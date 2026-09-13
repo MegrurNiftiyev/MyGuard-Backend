@@ -51,10 +51,10 @@ httpServer.listen(PORT, async () => {
           timestamp: new Date().toISOString(),
           status: 'OK'
         });
-        console.log(`[Firebase Test] Uğurla 'system_tests' kolleksiyasına test mesajı yazıldı!`);
+        console.log(`[Firebase Test] Successfully wrote test record to 'system_tests' collection!`);
       }
     } catch (err) {
-      console.error(`[Firebase Test Error] Test mesajı yazıla bilmədi:`, err);
+      console.error(`[Firebase Test Error] Failed to write test record:`, err);
     }
   }
 });
