@@ -35,7 +35,7 @@ httpServer.listen(PORT, async () => {
   console.log(`===================================================`);
   console.log(`[MyGuard Backend] Server running on port ${PORT}`);
   console.log(`[MyGuard Backend] Swagger Docs: http://localhost:${PORT}/api-docs`);
-  console.log(`[MyGuard Backend] Firebase Admin: ${isFirebaseInitialized ? 'CONNECTED' : 'MOCK/DEV MODE'}`);
+  console.log(`[MyGuard Backend] Firebase Admin: ${isFirebaseInitialized ? 'CONNECTED' : 'LOCAL DEVELOPMENT MODE'}`);
   console.log(`[MyGuard Backend] FastAPI Service: ${isFastApiHealthy ? `CONNECTED (${env.FASTAPI_ANALYSIS_URL})` : `UNAVAILABLE (${env.FASTAPI_ANALYSIS_URL})`}`);
   console.log(`===================================================`);
 

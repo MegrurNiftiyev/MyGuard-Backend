@@ -1,4 +1,4 @@
-import { Layer2ClassifierResult, Layer3LLMAnalysisResult } from './mockAnalysis.service.js';
+import { Layer2ClassifierResult, Layer3LLMAnalysisResult } from './securityAnalysis.types.js';
 import { SupportedLanguage, translate } from '../../utils/i18n.js';
 import { env } from '../../config/env.js';
 import { RISK_SCORING } from '../documents/riskScoring.config.js';

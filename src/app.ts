@@ -5,6 +5,8 @@ import { requireAuth } from './middlewares/requireAuth.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { swaggerSpec } from './config/swagger.js';
 import { isFirebaseInitialized } from './config/firebase.js';
+import { checkFastApiHealth } from './modules/analysis/fastapi.service.js';
+import { env } from './config/env.js';
 
 import authRoutes from './modules/auth/auth.routes.js';
 import documentRoutes from './modules/documents/documents.routes.js';
@@ -60,13 +62,15 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
  *       200:
  *         description: Operational status
  */
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  const fastApiConnected = await checkFastApiHealth();
   res.json({
     status: 'online',
     timestamp: new Date().toISOString(),
     firebaseInitialized: isFirebaseInitialized,
     mode: process.env.NODE_ENV || 'development',
-    fastApiMocked: true,
+    fastApiConnected,
+    fastApiUrl: env.FASTAPI_ANALYSIS_URL,
     swaggerDocsUrl: '/api-docs',
   });
 });

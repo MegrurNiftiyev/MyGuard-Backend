@@ -1,7 +1,8 @@
 import { db, storageBucket, isFirebaseInitialized } from '../../config/firebase.js';
 import { COLLECTIONS } from '../../config/collections.js';
 import { analyzeDocumentLayer1 } from '../analysis/ocrTextCompare.service.js';
-import { Layer2ClassifierResult, runMockLayer3SecurityLLM } from '../analysis/mockAnalysis.service.js';
+import { Layer2ClassifierResult } from '../analysis/securityAnalysis.types.js';
+import { runFallbackLayer3SecurityLLM } from '../analysis/fallbackAnalysis.service.js';
 import { classifyDocumentText } from '../analysis/fastapi.service.js';
 import { evaluateLayer3SecurityLLM } from '../analysis/llmSecurityReview.service.js';
 import { RISK_SCORING } from './riskScoring.config.js';
@@ -666,7 +667,7 @@ export async function getDocumentById(docId: string): Promise<Document | undefin
 }
 
 function createDemoFallbackDocument(docId: string, lang: SupportedLanguage = 'az'): Document {
-  const isDemoInjection = docId.toLowerCase().includes('injection') || docId.toLowerCase().includes('high-risk') || docId.toLowerCase().includes('mock-high-risk');
+  const isDemoInjection = docId.toLowerCase().includes('injection') || docId.toLowerCase().includes('high-risk') || docId.toLowerCase().includes('demo-high-risk');
 
   if (isDemoInjection) {
     return {
@@ -800,14 +801,14 @@ function createDemoFallbackDocument(docId: string, lang: SupportedLanguage = 'az
   };
 }
 
-function createMockHighRiskDocument(lang: SupportedLanguage = 'az'): Document {
+function createSampleSecurityReportDocument(lang: SupportedLanguage = 'az'): Document {
   return {
-    id: 'mock-high-risk-1',
+    id: 'demo-high-risk-1',
     ownerId: 'dev-user-123',
     fileName: 'cv_john_doe.pdf',
     fileSizeBytes: 125000,
     fileType: 'pdf',
-    uploadUrl: '/uploads/mock/cv_john_doe.pdf',
+    uploadUrl: '/uploads/demo/cv_john_doe.pdf',
     isConfidential: false,
     uploadedAt: new Date().toISOString(),
     scanStartedAt: new Date().toISOString(),

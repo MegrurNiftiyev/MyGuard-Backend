@@ -39,7 +39,7 @@ try {
       isFirebaseInitialized = true;
       console.log(`[Firebase Admin] Initialized via Render secret file: /etc/secrets/mygurad-firebase-admin.json`);
     } else {
-      console.warn('[Firebase Admin] Notice: Operating in local memory/mock fallback mode until serviceAccountKey.json is provided.');
+      console.warn('[Firebase Admin] Notice: Operating in local development fallback mode until serviceAccountKey.json is provided.');
     }
   } else {
     app = getApps()[0];
