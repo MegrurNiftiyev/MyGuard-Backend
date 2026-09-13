@@ -65,7 +65,7 @@ Every document uploaded to the API passes through a synchronized, 7-stage automa
                                  │
                                  ▼
   ┌─────────────────────────────────────────────────────────────┐
-  │ Layer 2: DeBERTa ML Microservice (Python FastAPI)            │
+  │ Layer 2: RETVec + CNN ML Microservice (Python FastAPI)        │
   │  - Deep NLP classification for prompt override vectors     │
   │  - Confidence scoring & injection category tagging         │
   └──────────────────────────────┬──────────────────────────────┘
@@ -96,7 +96,7 @@ The `finalRiskScore` (0-100) is dynamically computed by weighting metrics across
 3. `OCR_ANALYSIS`: Human-visible optical text recognition (`tesseract.js`).
 4. `TEXT_COMPARISON`: Layer 1 diff detection comparing visual OCR output with internal text streams.
 5. `HIDDEN_TEXT_DETECTION`: Font size, white-on-white text, and zero-opacity object inspection.
-6. `PROMPT_INJECTION_ANALYSIS`: Layer 2 ML DeBERTa classification call to Python FastAPI backend.
+6. `PROMPT_INJECTION_ANALYSIS`: Layer 2 RETVec + CNN ML classification call to Python FastAPI backend.
 7. `RISK_ASSESSMENT`: Layer 3 LLM semantic risk assessment, final score computation (0-100), and real-time Socket push.
 
 ---
@@ -181,11 +181,10 @@ interface DocumentRecord {
     status: 'clean' | 'suspicious' | 'danger';
   };
   layer2_classification?: {
-    label: 'clean' | 'injection' | 'jailbreak' | 'exfiltration';
+    label: 'safe' | 'suspicious' | 'injection';
     confidence: number;
     accuracy: number;
     message: string;
-    categories: string[];
     requiresUserConfirmation: boolean;
   };
   layer3_llmReview?: {
