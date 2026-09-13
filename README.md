@@ -125,6 +125,10 @@ The MyGuard platform consists of synchronized web applications, core gateway bac
 - **📖 Node.js Gateway Interactive Swagger UI Docs:** `https://mygurad-backend-v2.onrender.com/api-docs`
 - **⚡ Real-Time WebSocket Server (Socket.IO):** `https://mygurad-backend-v2.onrender.com`
 
+### 🖼️ Interactive Swagger API Documentation
+
+![MyGuard Gateway Swagger API Documentation](docs/images/swagger_api_docs.png)
+
 ### Common HTTP Headers:
 ```http
 Accept: application/json
