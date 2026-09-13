@@ -140,10 +140,20 @@ The MyGuard platform consists of synchronized web applications, core gateway bac
 ### 🖼️ Interactive Swagger API Documentation
 
 <p align="center">
-  <img src="screenshots/backend_swagger_api_docs.png" alt="Express Backend Swagger API Docs" width="100%" />
+  <img src="screenshots/backend_swagger_api_docs.png" alt="Express Backend Gateway Swagger API Docs" width="100%" />
+</p>
+<p align="center">
+  <i>Node.js Gateway REST API Interactive OpenAPI 3.0 Swagger UI documentation running live at <code>https://mygurad-backend-v2.onrender.com/api-docs</code>.</i>
 </p>
 
-*Interactive OpenAPI 3.0 Swagger UI documentation running live at `https://mygurad-backend-v2.onrender.com/api-docs`.*
+<br/>
+
+<p align="center">
+  <img src="screenshots/fastapi_ml_swagger_docs.png" alt="Python FastAPI ML Microservice Swagger API Docs" width="100%" />
+</p>
+<p align="center">
+  <i>Python FastAPI ML Microservice Interactive OpenAPI 3.0 Swagger UI documentation running live at <code>https://myguard-ai-backend.onrender.com/api-docs</code>.</i>
+</p>
 
 ### Common HTTP Headers:
 ```http
