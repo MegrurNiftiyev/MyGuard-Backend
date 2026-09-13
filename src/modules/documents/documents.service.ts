@@ -1,7 +1,7 @@
 import { db, storageBucket, isFirebaseInitialized } from '../../config/firebase.js';
 import { COLLECTIONS } from '../../config/collections.js';
 import { analyzeDocumentLayer1 } from '../analysis/ocrTextCompare.service.js';
-import { Layer2ClassifierResult, runMockLayer2Classifier, runMockLayer3SecurityLLM } from '../analysis/mockAnalysis.service.js';
+import { Layer2ClassifierResult, runMockLayer3SecurityLLM } from '../analysis/mockAnalysis.service.js';
 import { classifyDocumentText } from '../analysis/fastapi.service.js';
 import { evaluateLayer3SecurityLLM } from '../analysis/llmSecurityReview.service.js';
 import { RISK_SCORING } from './riskScoring.config.js';
@@ -256,8 +256,8 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       }
     }, false, lang);
 
-    // Layer 2: Direct LLM Security Classification
-    console.log(`[Pipeline Step 2/3: Layer 2 LLM] Direct LLM security classification started (+${Date.now() - pipelineStartTime}ms)...`);
+    // Layer 2: RETVec + CNN ML Microservice Classification (FastAPI)
+    console.log(`[Pipeline Step 2/3: Layer 2 ML] RETVec + CNN ML classification started (+${Date.now() - pipelineStartTime}ms)...`);
     await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { stepStatus: 'active' }, false, lang);
 
     const fullTextToClassify = [
@@ -266,31 +266,25 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
       filename
     ].filter(Boolean).join('\n');
 
-    let layer2Result: Layer2ClassifierResult = await runMockLayer2Classifier(fullTextToClassify, layer1Result.hiddenTextDetected);
+    const fastApiResult = await classifyDocumentText({
+      documentId: docId,
+      fullText: fullTextToClassify,
+    });
 
-    await sleep(500);
+    let layer2Result: Layer2ClassifierResult;
     
-    let isInjection = layer2Result.isInjection;
-    let confidence = layer2Result.confidence;
-    let mlMsg = isInjection 
-      ? translate('ml_injection_detected', lang) 
-      : translate('ml_safe_message', lang);
-
-    console.log(`[Pipeline Step 2/3: Layer 2 Result] Label=${layer2Result.classification} | IsInjection=${isInjection} | Conf=${confidence} (+${Date.now() - pipelineStartTime}ms)`);
-
-    await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { 
-      stepStatus: 'completed',
-      errorDetail: null,
-      layer2_classification: {
-        label: isInjection ? 'injection' : 'safe',
-        confidence,
-        accuracy: 0.98,
-        message: mlMsg,
-        requiresUserConfirmation: isInjection || layer1Result.hiddenTextDetected,
-      }
-    }, false, lang);
-
-    if (!layer2Result) {
+    if (fastApiResult) {
+      const isInjection = fastApiResult.label === 'injection';
+      const isSuspicious = fastApiResult.label === 'suspicious';
+      layer2Result = {
+        classification: isInjection ? 'High Risk' : isSuspicious ? 'Suspicious' : 'Safe',
+        confidence: fastApiResult.confidence,
+        isInjection: isInjection,
+        riskCategory: isInjection ? 'Prompt Injection' : 'None',
+        matchedSignatures: [],
+      };
+    } else {
+      console.warn(`[Pipeline Step 2/3: Layer 2 ML] FastAPI service unavailable or failed for document ${docId}.`);
       layer2Result = {
         classification: 'Safe',
         confidence: 0,
@@ -299,6 +293,28 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
         matchedSignatures: [],
       };
     }
+
+    await sleep(300);
+    
+    let isInjection = layer2Result.isInjection;
+    let confidence = layer2Result.confidence;
+    let mlMsg = isInjection 
+      ? translate('ml_injection_detected', lang) 
+      : translate('ml_safe_message', lang);
+
+    console.log(`[Pipeline Step 2/3: Layer 2 Result] Label=${fastApiResult?.label || 'safe'} | IsInjection=${isInjection} | Conf=${confidence} (+${Date.now() - pipelineStartTime}ms)`);
+
+    await updateDocumentAndEmit(docId, 'PROMPT_INJECTION_ANALYSIS', { 
+      stepStatus: 'completed',
+      errorDetail: null,
+      layer2_classification: {
+        label: fastApiResult ? fastApiResult.label : 'safe',
+        confidence,
+        accuracy: 0.98,
+        message: mlMsg,
+        requiresUserConfirmation: isInjection || (fastApiResult?.label === 'suspicious') || layer1Result.hiddenTextDetected,
+      }
+    }, false, lang);
 
     // Layer 3: Risk Assessment & LLM Security Evaluation
     console.log(`[Pipeline Step 3/3: Layer 3 LLM] Security review started (+${Date.now() - pipelineStartTime}ms)...`);
@@ -397,6 +413,8 @@ async function runPipeline(docId: string, fileBuffer: Buffer, filename: string, 
 
       if (isConfidential) {
         overallRiskScore = Math.round(l1Score * RISK_SCORING.weightsConfidential.l1 + l2Score * RISK_SCORING.weightsConfidential.l2);
+      } else if (!fastApiResult) {
+        overallRiskScore = Math.round(l1Score * RISK_SCORING.weightsL2Offline.l1 + l3Score * RISK_SCORING.weightsL2Offline.l3);
       } else {
         overallRiskScore = Math.round(
           l1Score * RISK_SCORING.weightsStandard.l1 + 
