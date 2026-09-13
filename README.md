@@ -8,6 +8,7 @@
   <img alt="Node.js" src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white">
   <img alt="Express.js" src="https://img.shields.io/badge/Express.js%20v5-000000?style=for-the-badge&logo=express&logoColor=white">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript%205.7-3178C6?style=for-the-badge&logo=typescript&logoColor=white">
+  <a href="https://huggingface.co/MegrurNiftiyev/MyGuard-Prompt-Injection-Detector"><img alt="Hugging Face" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model%20Hub-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black"></a>
   <img alt="Firebase" src="https://img.shields.io/badge/Firebase%20Admin-FFCA28?style=for-the-badge&logo=firebase&logoColor=black">
   <img alt="Socket.io" src="https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socketdotio&logoColor=white">
   <img alt="OpenAI" src="https://img.shields.io/badge/OpenAI%20(gpt--4o--mini)-412991?style=for-the-badge&logo=openai&logoColor=white">
@@ -105,19 +106,21 @@ The `finalRiskScore` (0-100) is dynamically computed by weighting metrics across
 
 The MyGuard platform consists of synchronized web applications, core gateway backends, ML microservices, and file collection infrastructure:
 
-### 🔗 Repositories & Live Platforms
+### 🔗 Repositories, Live Platforms & Model Hubs
 
-| Component Name | Type | GitHub Repository / Live URL |
+| Component Name | Type | GitHub Repository & Model Hub Links |
 | :--- | :--- | :--- |
-| **Python FastAPI ML Microservice** | AI Model Backend | [GitHub Repository](https://github.com/MegrurNiftiyev/IDDA-Final-Project-Ai-Backend) |
+| **Python FastAPI ML Microservice & AI Model** | AI Model Backend & Weights | [GitHub Repository](https://github.com/MegrurNiftiyev/IDDA-Final-Project-Ai-Backend) \| [🤗 Hugging Face Model Hub](https://huggingface.co/MegrurNiftiyev/MyGuard-Prompt-Injection-Detector) |
 | **Node.js Gateway Backend** | Gateway REST API | [GitHub Repository](https://github.com/MegrurNiftiyev/MyGuard-Backend) |
 | **MyGuard Web Frontend** | Web Application | [GitHub Repository](https://github.com/MegrurNiftiyev/MyGuard-Web) \| [Live Portal](https://my-guard-web.vercel.app/scan) |
 | **File Collection Team App** | Team Platform | [GitHub Repository](https://github.com/MegrurNiftiyev/team-file-collection-platform) \| [Live Platform](https://idda-team-file-collection-platform.vercel.app/) |
 
 ### 🚀 Production Live URLs & API Gateways
 
+- **🤗 Hugging Face Model Hub (Model Card & Weights):** `https://huggingface.co/MegrurNiftiyev/MyGuard-Prompt-Injection-Detector`
+- **🐙 Python FastAPI ML Repository (Source Code):** `https://github.com/MegrurNiftiyev/IDDA-Final-Project-Ai-Backend`
 - **🐍 Python FastAPI ML Microservice (Production):** `https://myguard-ai-backend.onrender.com`
-- **📖 ML Microservice Interactive Swagger UI Docs:** `https://myguard-ai-backend.onrender.com/docs`
+- **📖 ML Microservice Interactive Swagger UI Docs:** `https://myguard-ai-backend.onrender.com/api-docs` (and `/docs`)
 - **🚀 Node.js Gateway REST API Base URL (Production):** `https://mygurad-backend-v2.onrender.com/api`
 - **📖 Node.js Gateway Interactive Swagger UI Docs:** `https://mygurad-backend-v2.onrender.com/api-docs`
 - **⚡ Real-Time WebSocket Server (Socket.IO):** `https://mygurad-backend-v2.onrender.com`
