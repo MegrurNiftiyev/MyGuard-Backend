@@ -1,0 +1,31 @@
+<svg width="512" height="512" viewBox="0 0 100 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="myguard-shield-gradient" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#00A3FF" />
+      <stop offset="45%" stop-color="#0066FF" />
+      <stop offset="100%" stop-color="#0044DD" />
+    </linearGradient>
+    <linearGradient id="myguard-inner-highlight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.0" />
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Shield Shell -->
+  <path
+    d="M 50 4 C 70 8, 88 14, 94 28 C 96 60, 78 88, 50 106 C 22 88, 4 60, 6 28 C 12 14, 30 8, 50 4 Z"
+    fill="url(#myguard-shield-gradient)"
+  />
+
+  <!-- Glossy Top Inner Highlight -->
+  <path
+    d="M 50 7 C 68 11, 84 16, 89 29 C 91 55, 78 78, 50 99 C 22 78, 9 55, 11 29 C 16 16, 32 11, 50 7 Z"
+    fill="url(#myguard-inner-highlight)"
+  />
+
+  <!-- Center 'M' Monogram Emblem inside Shield -->
+  <path
+    d="M 25 76 V 32 H 34 L 50 56 L 66 32 H 75 V 76 H 64 V 48 L 52 66 H 48 L 36 48 V 76 Z"
+    fill="#FFFFFF"
+  />
+</svg>
