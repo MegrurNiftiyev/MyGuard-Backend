@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="screenshots/MyGuard-App-Logo.png" alt="MyGuard App Logo" width="120" />
+</p>
+
 # 🛡️ MyGuard AI Document Security Gateway Backend API
 
 <p align="center">
@@ -82,6 +86,14 @@ Every document uploaded to the API passes through a synchronized, 7-stage automa
 [ Final Risk Assessment & Decision: ALLOWED / SANITIZED / BLOCKED ]
 ```
 
+### 🖼️ 3-Layer Security AI Model Architecture Diagram
+
+<p align="center">
+  <img src="screenshots/ai_model_architecture.png" alt="3-Layer Security AI Model Architecture" width="100%" />
+</p>
+
+*High-Level detection flow across Layer 1 (OCR vs PDF Text), Layer 2 (RETVec + CNN ML Classifier), and Layer 3 (LLM Audit).*
+
 ### 🧮 Dynamic 3-Factor Weighted Composite Risk Score Algorithm:
 The `finalRiskScore` (0-100) is dynamically computed by weighting metrics across all 3 independent security layers:
 - **Factor 1 (Layer 1 OCR Mismatch & Hidden Text Score):** `(100 - matchPercent)` boosted to 75-95 if zero-opacity hidden text is detected.
@@ -127,7 +139,11 @@ The MyGuard platform consists of synchronized web applications, core gateway bac
 
 ### 🖼️ Interactive Swagger API Documentation
 
-![MyGuard Gateway Swagger API Documentation](docs/images/swagger_api_docs.png)
+<p align="center">
+  <img src="screenshots/backend_swagger_api_docs.png" alt="Express Backend Swagger API Docs" width="100%" />
+</p>
+
+*Interactive OpenAPI 3.0 Swagger UI documentation running live at `https://mygurad-backend-v2.onrender.com/api-docs`.*
 
 ### Common HTTP Headers:
 ```http
@@ -829,28 +845,3 @@ Licensed under the **MIT License**.
 
 ### 🎉 Final MVP Release Status: Completed & Production Ready
 All REST API endpoints, 3-layer security features, FastAPI ML microservice proxies, Socket.IO scanning pipeline, and Swagger docs are 100% verified and production ready.
-
----
-
-
----
-
-## 🏗️ 3-Layer Security AI Model Architecture Diagram
-
-<p align="center">
-  <img src="screenshots/ai_model_architecture.png" alt="3-Layer Security AI Model Architecture" width="100%" />
-</p>
-
-*High-Level detection flow across Layer 1 (OCR vs PDF Text), Layer 2 (RETVec + CNN ML Classifier), and Layer 3 (LLM Audit).* 
-
----
-
-## 📸 Interactive API Swagger Documentation Screenshot
-
-<p align="center">
-  <img src="screenshots/backend_swagger_api_docs.png" alt="Express Backend Swagger API Docs" width="100%" />
-</p>
-
-*Interactive OpenAPI 3.0 Swagger UI documentation running live at `http://localhost:3001/api-docs` and `https://mygurad-backend-v2.onrender.com/api-docs`.*
-
----
