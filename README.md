@@ -89,7 +89,7 @@ Every document uploaded to the API passes through a synchronized, 7-stage automa
 ### 🖼️ 3-Layer Security AI Model Architecture Diagram
 
 <p align="center">
-  <img src="screenshots/ai_model_architecture.png" alt="3-Layer Security AI Model Architecture" width="650" />
+  <img src="screenshots/ai_model_architecture.png" alt="3-Layer Security AI Model Architecture" width="350" />
 </p>
 
 *High-Level detection flow across Layer 1 (OCR vs PDF Text), Layer 2 (RETVec + CNN ML Classifier), and Layer 3 (LLM Audit).*
