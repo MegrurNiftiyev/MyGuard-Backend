@@ -122,10 +122,9 @@ The MyGuard platform consists of synchronized web applications, core gateway bac
 
 | Component Name | Type | GitHub Repository & Model Hub Links |
 | :--- | :--- | :--- |
-| **Python FastAPI ML Microservice & AI Model** | AI Model Backend & Weights | [GitHub Repository](https://github.com/MegrurNiftiyev/IDDA-Final-Project-Ai-Backend) \| [🤗 Hugging Face Model Hub](https://huggingface.co/MegrurNiftiyev/MyGuard-Prompt-Injection-Detector) |
-| **Node.js Gateway Backend** | Gateway REST API | [GitHub Repository](https://github.com/MegrurNiftiyev/MyGuard-Backend) |
+| **Python FastAPI ML Microservice & AI Model** | AI Model Backend & Weights | [GitHub Repository](https://github.com/MegrurNiftiyev/IDDA-Final-Project-Ai-Backend) \| [🤗 Hugging Face Model Hub](https://huggingface.co/MegrurNiftiyev/MyGuard-Prompt-Injection-Detector) \| [Live Swagger](https://myguard-ai-backend.onrender.com/api-docs) |
+| **Node.js Gateway Backend** | Gateway REST API | [GitHub Repository](https://github.com/MegrurNiftiyev/MyGuard-Backend) \| [Live Swagger](https://mygurad-backend-v2.onrender.com/api-docs/) |
 | **MyGuard Web Frontend** | Web Application | [GitHub Repository](https://github.com/MegrurNiftiyev/MyGuard-Web) \| [Live Portal](https://my-guard-web.vercel.app/scan) |
-| **File Collection Team App** | Team Platform | [GitHub Repository](https://github.com/MegrurNiftiyev/team-file-collection-platform) \| [Live Platform](https://idda-team-file-collection-platform.vercel.app/) |
 
 ### 🚀 Production Live URLs & API Gateways
 
