@@ -36,8 +36,11 @@ Thumbs.db
 *.log
 logs/
 
-# Scratch & Temporary Tools
-scratch/
+# Documentation Guides to Ignore
+NODE_JS_INTEGRATION_GUIDE.md
+API_INTEGRATION_GUIDE.md
+REPOSITORY_MAINTENANCE.md
+
 
 
 

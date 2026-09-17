@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="screenshots/MyGuard-App-Logo.png" alt="MyGuard App Logo" width="120" />
+</p>
+
 # 🛡️ MyGuard AI Document Security Gateway Backend API
 
 <p align="center">
@@ -8,6 +12,7 @@
   <img alt="Node.js" src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white">
   <img alt="Express.js" src="https://img.shields.io/badge/Express.js%20v5-000000?style=for-the-badge&logo=express&logoColor=white">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript%205.7-3178C6?style=for-the-badge&logo=typescript&logoColor=white">
+  <a href="https://huggingface.co/MegrurNiftiyev/MyGuard-Prompt-Injection-Detector"><img alt="Hugging Face" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model%20Hub-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black"></a>
   <img alt="Firebase" src="https://img.shields.io/badge/Firebase%20Admin-FFCA28?style=for-the-badge&logo=firebase&logoColor=black">
   <img alt="Socket.io" src="https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socketdotio&logoColor=white">
   <img alt="OpenAI" src="https://img.shields.io/badge/OpenAI%20(gpt--4o--mini)-412991?style=for-the-badge&logo=openai&logoColor=white">
@@ -65,7 +70,7 @@ Every document uploaded to the API passes through a synchronized, 7-stage automa
                                  │
                                  ▼
   ┌─────────────────────────────────────────────────────────────┐
-  │ Layer 2: DeBERTa ML Microservice (Python FastAPI)            │
+  │ Layer 2: RETVec + CNN ML Microservice (Python FastAPI)        │
   │  - Deep NLP classification for prompt override vectors     │
   │  - Confidence scoring & injection category tagging         │
   └──────────────────────────────┬──────────────────────────────┘
@@ -80,6 +85,14 @@ Every document uploaded to the API passes through a synchronized, 7-stage automa
                                  ▼
 [ Final Risk Assessment & Decision: ALLOWED / SANITIZED / BLOCKED ]
 ```
+
+### 🖼️ 3-Layer Security AI Model Architecture Diagram
+
+<p align="center">
+  <img src="screenshots/ai_model_architecture.png" alt="3-Layer Security AI Model Architecture" width="650" />
+</p>
+
+*High-Level detection flow across Layer 1 (OCR vs PDF Text), Layer 2 (RETVec + CNN ML Classifier), and Layer 3 (LLM Audit).*
 
 ### 🧮 Dynamic 3-Factor Weighted Composite Risk Score Algorithm:
 The `finalRiskScore` (0-100) is dynamically computed by weighting metrics across all 3 independent security layers:
@@ -96,7 +109,7 @@ The `finalRiskScore` (0-100) is dynamically computed by weighting metrics across
 3. `OCR_ANALYSIS`: Human-visible optical text recognition (`tesseract.js`).
 4. `TEXT_COMPARISON`: Layer 1 diff detection comparing visual OCR output with internal text streams.
 5. `HIDDEN_TEXT_DETECTION`: Font size, white-on-white text, and zero-opacity object inspection.
-6. `PROMPT_INJECTION_ANALYSIS`: Layer 2 ML DeBERTa classification call to Python FastAPI backend.
+6. `PROMPT_INJECTION_ANALYSIS`: Layer 2 RETVec + CNN ML classification call to Python FastAPI backend.
 7. `RISK_ASSESSMENT`: Layer 3 LLM semantic risk assessment, final score computation (0-100), and real-time Socket push.
 
 ---
@@ -105,22 +118,42 @@ The `finalRiskScore` (0-100) is dynamically computed by weighting metrics across
 
 The MyGuard platform consists of synchronized web applications, core gateway backends, ML microservices, and file collection infrastructure:
 
-### 🔗 Repositories & Live Platforms
+### 🔗 Repositories, Live Platforms & Model Hubs
 
-| Component Name | Type | GitHub Repository / Live URL |
+| Component Name | Type | GitHub Repository & Model Hub Links |
 | :--- | :--- | :--- |
-| **Python FastAPI ML Microservice** | AI Model Backend | [GitHub Repository](https://github.com/MegrurNiftiyev/IDDA-Final-Project-Ai-Backend) |
+| **Python FastAPI ML Microservice & AI Model** | AI Model Backend & Weights | [GitHub Repository](https://github.com/MegrurNiftiyev/IDDA-Final-Project-Ai-Backend) \| [🤗 Hugging Face Model Hub](https://huggingface.co/MegrurNiftiyev/MyGuard-Prompt-Injection-Detector) |
 | **Node.js Gateway Backend** | Gateway REST API | [GitHub Repository](https://github.com/MegrurNiftiyev/MyGuard-Backend) |
 | **MyGuard Web Frontend** | Web Application | [GitHub Repository](https://github.com/MegrurNiftiyev/MyGuard-Web) \| [Live Portal](https://my-guard-web.vercel.app/scan) |
 | **File Collection Team App** | Team Platform | [GitHub Repository](https://github.com/MegrurNiftiyev/team-file-collection-platform) \| [Live Platform](https://idda-team-file-collection-platform.vercel.app/) |
 
 ### 🚀 Production Live URLs & API Gateways
 
+- **🤗 Hugging Face Model Hub (Model Card & Weights):** `https://huggingface.co/MegrurNiftiyev/MyGuard-Prompt-Injection-Detector`
+- **🐙 Python FastAPI ML Repository (Source Code):** `https://github.com/MegrurNiftiyev/IDDA-Final-Project-Ai-Backend`
 - **🐍 Python FastAPI ML Microservice (Production):** `https://myguard-ai-backend.onrender.com`
-- **📖 ML Microservice Interactive Swagger UI Docs:** `https://myguard-ai-backend.onrender.com/docs`
+- **📖 ML Microservice Interactive Swagger UI Docs:** `https://myguard-ai-backend.onrender.com/api-docs` (and `/docs`)
 - **🚀 Node.js Gateway REST API Base URL (Production):** `https://mygurad-backend-v2.onrender.com/api`
 - **📖 Node.js Gateway Interactive Swagger UI Docs:** `https://mygurad-backend-v2.onrender.com/api-docs`
 - **⚡ Real-Time WebSocket Server (Socket.IO):** `https://mygurad-backend-v2.onrender.com`
+
+### 🖼️ Interactive Swagger API Documentation
+
+<p align="center">
+  <img src="screenshots/backend_swagger_api_docs.png" alt="Express Backend Gateway Swagger API Docs" width="100%" />
+</p>
+<p align="center">
+  <i>Node.js Gateway REST API Interactive OpenAPI 3.0 Swagger UI documentation running live at <code>https://mygurad-backend-v2.onrender.com/api-docs</code>.</i>
+</p>
+
+<br/>
+
+<p align="center">
+  <img src="screenshots/fastapi_ml_swagger_docs.png" alt="Python FastAPI ML Microservice Swagger API Docs" width="100%" />
+</p>
+<p align="center">
+  <i>Python FastAPI ML Microservice Interactive OpenAPI 3.0 Swagger UI documentation running live at <code>https://myguard-ai-backend.onrender.com/api-docs</code>.</i>
+</p>
 
 ### Common HTTP Headers:
 ```http
@@ -181,11 +214,10 @@ interface DocumentRecord {
     status: 'clean' | 'suspicious' | 'danger';
   };
   layer2_classification?: {
-    label: 'clean' | 'injection' | 'jailbreak' | 'exfiltration';
+    label: 'safe' | 'suspicious' | 'injection';
     confidence: number;
     accuracy: number;
     message: string;
-    categories: string[];
     requiresUserConfirmation: boolean;
   };
   layer3_llmReview?: {

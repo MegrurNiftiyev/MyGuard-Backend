@@ -35,7 +35,7 @@ httpServer.listen(PORT, async () => {
   console.log(`===================================================`);
   console.log(`[MyGuard Backend] Server running on port ${PORT}`);
   console.log(`[MyGuard Backend] Swagger Docs: http://localhost:${PORT}/api-docs`);
-  console.log(`[MyGuard Backend] Firebase Admin: ${isFirebaseInitialized ? 'CONNECTED' : 'MOCK/DEV MODE'}`);
+  console.log(`[MyGuard Backend] Firebase Admin: ${isFirebaseInitialized ? 'CONNECTED' : 'LOCAL DEVELOPMENT MODE'}`);
   console.log(`[MyGuard Backend] FastAPI Service: ${isFastApiHealthy ? `CONNECTED (${env.FASTAPI_ANALYSIS_URL})` : `UNAVAILABLE (${env.FASTAPI_ANALYSIS_URL})`}`);
   console.log(`===================================================`);
 
@@ -51,10 +51,10 @@ httpServer.listen(PORT, async () => {
           timestamp: new Date().toISOString(),
           status: 'OK'
         });
-        console.log(`[Firebase Test] Uğurla 'system_tests' kolleksiyasına test mesajı yazıldı!`);
+        console.log(`[Firebase Test] Successfully wrote test record to 'system_tests' collection!`);
       }
     } catch (err) {
-      console.error(`[Firebase Test Error] Test mesajı yazıla bilmədi:`, err);
+      console.error(`[Firebase Test Error] Failed to write test record:`, err);
     }
   }
 });
